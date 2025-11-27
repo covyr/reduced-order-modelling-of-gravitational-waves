@@ -1,0 +1,27 @@
+[project]
+name = "romgw"
+version = "0.1.0"
+description = "Reduced-order model gravitational wave utilities"
+authors = [
+    { name = "Connor Campbell" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "numpy>=1.24",
+    "pydantic-settings>=2.2",
+    "PyCBC>=2.9.0",
+    "lalsuite>=7.26.1",
+    "matplotlib>=3.10.7"
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
