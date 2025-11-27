@@ -26,7 +26,7 @@ from romgw.typing.core import (
 
 
 def interpolate(
-    h_fiducial: ComplexArray,
+    fiducial_h: ComplexArray,
     fiducial_time: RealArray,
     common_time: RealArray = COMMON_TIME
 ) -> ComplexArray:
@@ -39,7 +39,7 @@ def interpolate(
     
     Parameters
     ----------
-    h_fiducial : ndarray of shape (n,)
+    fiducial_h : ndarray of shape (n,)
         The waveform values defined on the fiducial time grid.
     fiducial_time : ndarray of shape (n,)
         The time grid on which the waveform is originally defined by
@@ -50,22 +50,24 @@ def interpolate(
     
     Returns
     -------
-    h_common : ndarray of shape (L,)
+    common_h : ndarray of shape (L,)
         The interpolated waveform defined on the common time grid.
     """
     # Real part.
     imp_real = InterpolatedUnivariateSpline(x=fiducial_time,
-                                            y=h_fiducial.real,
+                                            y=fiducial_h.real,
                                             k=5)
-    h_common_real = np.asarray(imp_real(common_time), dtype=np.float64)
+    common_h_real: RealArray = np.asarray(imp_real(common_time),
+                                          dtype=np.float64)
     # Imaginary part.
     imp_imag = InterpolatedUnivariateSpline(x=fiducial_time,
-                                            y=h_fiducial.imag,
+                                            y=fiducial_h.imag,
                                             k=5)
-    h_common_imag = np.asarray(imp_imag(common_time), dtype=np.float64)
+    common_h_imag: RealArray = np.asarray(imp_imag(common_time),
+                                          dtype=np.float64)
     # Complex sum.
-    h_common = h_common_real + 1j * h_common_imag
-    return h_common
+    common_h: ComplexArray = common_h_real + 1j * common_h_imag
+    return common_h
 
 
 def generate_seobnrv5_waveform(
@@ -87,11 +89,11 @@ def generate_seobnrv5_waveform(
     chi1 : float or ndarray of shape (3,)
         Dimensionless spin of the more massive BH. For no-spin (NS) and
         aligned-spin (AS) BBHs, provide the z-component as a float. For
-        precessing (P) BBHs, provide the full 3D spin vector as an array.
+        precessing (PS) BBHs, provide the full 3D spin vector as an array.
     chi2 : float or ndarray of shape (3,)
         Dimensionless spin of the less massive BH. For no-spin (NS) and
         aligned-spin (AS) BBHs, provide the z-component as a float. For
-        precessing (P) BBHs, provide the full 3D spin vector as an array.
+        precessing (PS) BBHs, provide the full 3D spin vector as an array.
     
     Returns
     -------
@@ -106,23 +108,19 @@ def generate_seobnrv5_waveform(
     --------
     interpolate : Interpolate waveform onto common time grid.
     """
-    # Choose approximant, guided by PhysicalParams.
-    # PhysicalParams class enforces dimensional consistency across spins.
     precessing = False if np.ndim(params.chi1) == 0 else True
     approximant = "SEOBNRv5HM" if not precessing else "SEOBNRv5PHM"
 
-    # Retrieve mass ratio from PhysicalParams.
     q: MassRatio = params.q
 
-    # Retrieve spins from PhysicalParams.
-    if precessing:  # RealArray of shape (3,)
+    if precessing:
         chi1: SpinVector = params.chi1
         chi2: SpinVector = params.chi2
-    else:  # float
+    else:
         chi1: SpinScalar = params.chi1
         chi2: SpinScalar = params.chi2
 
-    # Generate the waveform modes and time it
+    # Generate the waveform modes and time it.
     start = time.perf_counter()
     res = pyseobnr.generate_waveform.generate_modes_opt(
         q=q,
@@ -139,16 +137,13 @@ def generate_seobnrv5_waveform(
 
     # Interpolate modes onto common time grid and make them Waveform instances.
     for mode in modes:
-        # Interpolate fiducial waveform onto common time grid.
-        waveform_arr = interpolate(h_fiducial=modes[mode],
+        waveform_arr = interpolate(fiducial_h=modes[mode],
                                    fiducial_time=seobnrv5_time,
                                    common_time=COMMON_TIME)
-        # Instantiate as FullWaveform, retaining params.
-        waveform = FullWaveform(waveform_arr=waveform_arr, params=params)
-        # Update modes dict with FullWaveform instance.
+        waveform = FullWaveform(waveform_arr, params)
         modes[mode] = waveform
 
-    # Make FiducialStat instance for the waveform generation
+    # Make ModelStat instance for the waveform generation.
     stat = ModelStat(approximant=approximant,
                      modes=list(modes.keys()),
                      generation_time=generation_time,
@@ -160,7 +155,8 @@ def generate_seobnrv5_waveform(
 def main(
     bbh_spin: BBHSpinType,
     dataset: DatasetType,
-    saving: bool = False
+    saving: bool = False,
+    verbose: bool = False,
 ) -> None:
     """
     Generate fiducial waveforms for a dataset using SEOBNRv5.
@@ -171,14 +167,16 @@ def main(
 
     Parameters
     ----------
-    spin : {"NS", "AS", "PS"}
+    bbh_spin : {"NS", "AS", "PS"}
         The complexity regarding the BBH spins. "NS" for no-spin, "AS" for
-        aligned-spin, or "P" for precessing.
+        aligned-spin, or "PS" for precessing.
     dataset : {"train", "test"}
         The dataset type. "train" for training data (larger) or "test" for
         testing data (smaller).
-    saving: bool
+    saving : bool
         Whether to save/perform filesystem operations or not.
+    verbose : bool
+        Whether to print statements which log progress.
 
     Returns
     -------
@@ -192,25 +190,20 @@ def main(
     bbh_spin = validate_literal(bbh_spin, BBHSpinType)
     dataset = validate_literal(dataset, DatasetType)
 
-    # Every directory in this script is a child of this one.
     dataset_dir = PROJECT_ROOT / "data" / bbh_spin / dataset
 
-    # Load the parameter space.
     param_space_filepath = dataset_dir / "parameter_space.npy"
     param_space = np.load(param_space_filepath)
 
-    # For filename/printing purposes.
-    lsM = len(str((M := param_space.shape[0]) - 1))
+    lsM = len(str((M := param_space.shape[0]) - 1))  # for printing
 
-    # Empty directories to save to,
-    # to avoid issues with reusing directories.
     if saving:
-        # Generation time directory.
+        # Empty directories to save to.
+        # Avoids issues with reusing directories.
         stat_dir = dataset_dir / "stats"
         stat_dir.mkdir(parents=True, exist_ok=True)
         empty_directory(stat_dir)
 
-        # Mode directories.
         for path in dataset_dir.iterdir():
             if path.is_dir() and path.name in MODE_VALUES:
                 for component in ("full", "amplitude", "phase"):
@@ -218,13 +211,15 @@ def main(
                     wf_dir.mkdir(parents=True, exist_ok=True)
                     empty_directory(wf_dir)
 
-    for i, params in enumerate(param_space):
-        print(f"Generating waveform {i+1:0{lsM}d}/{M}", end='\r')
+    if verbose:
+        print(f"Fiducial waveform generation for {bbh_spin=}, {dataset=}")
 
-        # Retrieve mass ratio from params array.
+    for i, params in enumerate(param_space):
+        if verbose:
+            print(f"Generating waveform {i+1:0{lsM}d}/{M}", end='\r')
+
         q: MassRatio = float(params[0])
 
-        # Retrieve spins from params array.
         if bbh_spin == "PS":
             chi1: SpinVector = params[1:4].astype(np.float64)
             chi2: SpinVector = params[4:7].astype(np.float64)
@@ -232,52 +227,39 @@ def main(
             chi1: SpinScalar = float(params[1])
             chi2: SpinScalar = float(params[2])
         
-        # Instantiate params as PhysicalParams,
-        # ensuring enforcement of param constraints.
         physical_params = PhysicalParams(q, chi1, chi2)
         
         # Generate waveform with fiducial model.
         modes, stat = generate_seobnrv5_waveform(params=physical_params)
-        # print(f"{modes=}")
-        # print(f"{stat=}")
 
-        # Save stat.
         if saving:
             stat_file = stat_dir / f"stat_{i:0{lsM}d}.json"
             stat.to_file(stat_file)
 
         for mode in modes:
-            # Full mode waveform.
             waveform: FullWaveform = modes[mode]
-            # Amplitude for mode waveform.
             amplitude: ComponentWaveform = waveform.amplitude
-            # Phase for mode waveform.
             phase: ComponentWaveform = waveform.phase
 
-            # Saving.
             if saving:
-                # Set filename for waveforms to save to.
                 filename = f"waveform_{i:0{lsM}d}.npz"
-
-                # 'Mode-anchored' directory.
                 mode_dir = dataset_dir / mode
 
-                # Full mode waveform.
                 wf_full_file = mode_dir / "full" / "raw" / filename
                 waveform.to_file(wf_full_file)
 
-                # Amplitude of mode waveform.
                 wf_amplitude_file = mode_dir / "amplitude" / "raw" / filename
                 amplitude.to_file(wf_amplitude_file)
 
-                # Phase of mode waveform.
                 wf_phase_file = mode_dir / "phase" / "raw" / filename
                 phase.to_file(wf_phase_file)
-                
-    print("Waveform generation complete.")
+    
+    if verbose:
+        print("Waveform generation complete.")
 
 
 if __name__ == "__main__":
     main(bbh_spin="NS",
-         dataset="test",
-         saving=True)
+         dataset="train",
+         saving=True,
+         verbose=True)

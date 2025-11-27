@@ -59,77 +59,50 @@ def generate_param_space(
     # Validate literals. Raises exception if invalid.
     bbh_spin = validate_literal(bbh_spin, BBHSpinType)
 
-    # Handle NoneType seeds.
     if not seeds:
         seeds = [None] * 11
     
-    # Generate param space for "PS" BBHSpinType.
     if bbh_spin == "PS":
-        # Mass ratios.
-        q_space = uniform_random_space(n,
-                                       seed=seeds[0],
-                                       *MASS_RATIO_DOMAIN)
+        q_space = uniform_random_space(n, *MASS_RATIO_DOMAIN, seed=seeds[0])
         
-        # Spherial polar components of chi1.
-        chi1_mag_space = uniform_random_space(n,
-                                              seed=seeds[1],
-                                              *SPIN_MAG_DOMAIN)
-        chi1_theta_space = uniform_random_space(n,
-                                                seed=seeds[2],
-                                                *SPIN_THETA_DOMAIN)
-        chi1_phi_space = uniform_random_space(n,
-                                              seed=seeds[3],
-                                              *SPIN_PHI_DOMAIN)
-        # Combine spherical polar components of chi1 into one array.
+        chi1_magnitudes = uniform_random_space(n,
+                                               *SPIN_MAG_DOMAIN,
+                                               seed=seeds[1])
+        chi1_thetas = uniform_random_space(n,
+                                           *SPIN_THETA_DOMAIN,
+                                           seed=seeds[2])
+        chi1_phis = uniform_random_space(n,
+                                         *SPIN_PHI_DOMAIN,
+                                         seed=seeds[3])
         chi1_spherical_polars = (
-            np.hstack([chi1_mag_space, chi1_theta_space, chi1_phi_space])
+            np.hstack([chi1_magnitudes, chi1_thetas, chi1_phis])
             .astype(np.float64)
         )
-        # Convert chi1 spherical polar components to cartesian components.
         chi1_space = spherpol_to_cartesian(chi1_spherical_polars)
 
-        # Spherial polar components of chi2.
-        chi2_mag_space = uniform_random_space(n,
-                                              seed=seeds[4],
-                                              *SPIN_MAG_DOMAIN)
-        chi2_theta_space = uniform_random_space(n,
-                                                seed=seeds[5],
-                                                *SPIN_THETA_DOMAIN)
-        chi2_phi_space = uniform_random_space(n,
-                                              seed=seeds[6],
-                                              *SPIN_PHI_DOMAIN)
-        # Combine spherical polar components of chi1 into one array.
+        chi2_magnitudes = uniform_random_space(n,
+                                               *SPIN_MAG_DOMAIN,
+                                               seed=seeds[4])
+        chi2_thetas = uniform_random_space(n,
+                                           *SPIN_THETA_DOMAIN,
+                                            seed=seeds[5])
+        chi2_phis = uniform_random_space(n,
+                                         *SPIN_PHI_DOMAIN,
+                                         seed=seeds[6])
         chi2_spherical_polars = (
-            np.hstack([chi2_mag_space, chi2_theta_space, chi2_phi_space])
+            np.hstack([chi2_magnitudes, chi2_thetas, chi2_phis])
             .astype(np.float64)
         )
-        # Convert chi1 spherical polar components to cartesian components.
         chi2_space = spherpol_to_cartesian(chi2_spherical_polars)
         
-    # Generate param space for "AS" BBHSpinType.
     elif bbh_spin == "AS":
-        # Mass ratios.
-        q_space = uniform_random_space(n,
-                                       seed=seeds[7],
-                                       *MASS_RATIO_DOMAIN)
-        # Scalar chi1.
-        chi1_space = uniform_random_space(n,
-                                          seed=seeds[8],
-                                          *SPIN_MAG_DOMAIN)
-        # Scalar chi2.
-        chi2_space = uniform_random_space(n,
-                                          seed=seeds[9],
-                                          *SPIN_MAG_DOMAIN)
+        q_space = uniform_random_space(n, *MASS_RATIO_DOMAIN, seed=seeds[7])
+        chi1_space = uniform_random_space(n, *SPIN_MAG_DOMAIN, seed=seeds[8])
+        chi2_space = uniform_random_space(n, *SPIN_MAG_DOMAIN, seed=seeds[9])
 
-    # Generate param space for "NS" BBHSpinType.
     else:
-        # Mass ratios.
-        q_space = uniform_random_space(n,
-                                       seed=seeds[10],
-                                       *MASS_RATIO_DOMAIN)
-        # Zero chi1.
+        q_space = uniform_random_space(n, *MASS_RATIO_DOMAIN, seed=seeds[10])
         chi1_space = np.zeros_like(q_space).astype(np.float64)
-        # Zero chi2.
         chi2_space = np.zeros_like(q_space).astype(np.float64)
 
     # Combine mass ratio and spins into one param space array, with shape
@@ -147,43 +120,41 @@ def main(
     n: int | None = None,
     seeds: list[int] | None = None,
     saving: bool = False,
-    overwrite: bool = False,
+    overwriting: bool = False,
+    verbose: bool = False,
 ) -> None:
     """"""
     # Validate literals. Raises exception if invalid.
     bbh_spin = validate_literal(bbh_spin, BBHSpinType)
     dataset = validate_literal(dataset, DatasetType)
     
-    # Auto-assign n to the constant corresponding to the dataset.
     if not n:
         n = N_TRAIN if dataset == "train" else N_TEST
     
-    # Auto-assign seeds to the constants corresponding to the dataset.
     if not seeds:
         seeds = TRAIN_SEEDS if dataset == "train" else TEST_SEEDS
 
-    # Generate param space.
-    print(f"Generating parameter space for {bbh_spin=}, {dataset=}.")
+    if verbose:
+        print(f"Generating parameter space for {bbh_spin=}, {dataset=}.")
 
     param_space = generate_param_space(bbh_spin, n, seeds)
 
     if saving:
-        # Directory to save the param space into.
-        data_dir = PROJECT_ROOT / "data" / bbh_spin / dataset
-        # Ensure directory exists.
-        data_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = PROJECT_ROOT / "data" / bbh_spin / dataset
+        save_dir.mkdir(parents=True, exist_ok=True)
 
-        param_space_file = data_dir / "parameter_space.npy"
-        if param_space_file.exists() and not overwrite:
+        param_space_file = save_dir / "parameter_space.npy"
+        if param_space_file.exists() and not overwriting:
             raise FileExistsError(f"File already exists: {param_space_file}")
-        # Save param space.
         np.save(param_space_file, param_space)
-            
-    print(f"Parameter space generation complete.")
+    
+    if verbose:
+        print(f"Parameter space generation complete.")
 
 
 if __name__ == "__main__":
     main(bbh_spin="NS",
-         dataset="test",
-         saving=False,
-         overwrite=False)
+         dataset="train",
+         saving=True,
+         overwriting=False,
+         verbose=True)
