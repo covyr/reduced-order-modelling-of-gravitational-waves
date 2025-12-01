@@ -68,17 +68,17 @@ def reduced_basis(
 ) -> tuple[ComponentWaveformDataset, RealArray]:
     """
     Construct an orthonormal reduced basis using a greedy algorithm
-    with Modified Gram-Schmidt orthogonalization.
+    with Modified Gram-Schmidt orthogonalisation.
 
     This function incrementally builds a reduced basis by iteratively
-    selecting the waveform with the largest residual norm, orthonormalizing
+    selecting the waveform with the largest residual norm, orthonormalising
     it against the existing basis, and updating all residuals. The process
     continues until the maximum residual norm falls below the specified
     tolerance or the basis reaches the maximum allowed size.
 
     Parameters
     ----------
-    waveforms : WaveformCollection
+    waveforms : ComponentWaveformDataset
         Collection of input waveforms. The input object is not modified.
     tolerance : float
         Stopping criterion. The algorithm terminates when the maximum
@@ -98,9 +98,9 @@ def reduced_basis(
 
     Returns
     -------
-    rb : WaveformCollection
+    rb : ComponentWaveformDataset
         Orthonormal reduced basis constructed from the input waveforms.
-    greedy_errors : ndarray of shape (n_basis,)
+    greedy_errors_arr : ndarray of shape (n_basis,)
         Array containing the maximum residual norm at each greedy
         iteration, tracking the approximation error as the basis grows.
 
@@ -123,7 +123,7 @@ def reduced_basis(
     The Modified Gram-Schmidt procedure ensures numerical stability
     during the orthonormalization process.
     """
-    # Defensive copy of residuals (create independent waveform instances)
+    # Defensive copy of residuals (create independent waveform instances).
     residuals: list[ComponentWaveform] = [
         rewrap_like(wf, wf.copy())
         for wf in waveforms._waveforms
@@ -132,7 +132,7 @@ def reduced_basis(
     # Extract component value from residuals.
     component = str(residuals[1].component)
 
-    # For filename/printing purposes.
+    # For filename/printing purposes -> all numbers have the same length.
     lsM = len(str((M := len(residuals)) - 1))
 
     if M == 0:
@@ -154,19 +154,18 @@ def reduced_basis(
         max_err = float(errors[idx])
         greedy_errors.append(max_err)
 
-        if verbose:
-            print(f"Selecting index {idx} with squared-norm {max_err:.6g}")
-
         if max_err <= tolerance:
-            print(' ' * 80, end='\r')
-            print(f"Tolerance met ({max_err:.2e} <= {tolerance:.2e}) "
-                  f"with {len(rb)} reduced basis elements.")
+            if verbose:
+                print(' ' * 80, end='\r')
+                print(f"Tolerance met ({max_err:.2e} <= {tolerance:.2e}) "
+                      f"with {len(rb)} reduced basis elements.")
             break
 
         if len(rb) >= max_basis:
-            print(' ' * 80, end='\r')
-            print(f"Tolerance met ({max_err:.2e} > {tolerance:.2e}) "
-                  f"with {max_basis} reduced basis elements.")
+            if verbose:
+                print(' ' * 80, end='\r')
+                print(f"Tolerance met ({max_err:.2e} > {tolerance:.2e}) "
+                      f"with {max_basis} reduced basis elements.")
 
         # Select residual with largest norm.
         r = residuals.pop(idx)
@@ -174,17 +173,12 @@ def reduced_basis(
 
         # Skip if zero (numerically).
         if mag2(r, time) <= zero_tol:
-            if verbose:
-                print("Selected residual is near-zero; skipping.")
             continue
 
         # Normalise -> new basis element.
         try:
             e = normalise(r, time, zero_tol)
         except ValueError:
-            # numerical zero; skip
-            if verbose:
-                print("Normalization failed (zero norm). Skipping element.")
             continue
 
         rb.add_waveform(e)
@@ -207,12 +201,8 @@ def reduced_basis(
         errors = np.sum(R**2, axis=1)  # real-valued
 
         if verbose:
-            G = gram_matrix(rb, time, verbose=True)
-            print("Gram matrix:")
-            print(G)
-        
-        print(f"m={len(rb):0{lsM}d}/{M}, "
-              f"greedy error={max_err:.2e}", end='\r')
+            print(f"m={len(rb):0{lsM}d}/{M}, "
+                  f"greedy error={max_err:.2e}", end='\r')
 
     greedy_errors[0] = 1  # by definition
     greedy_errors_arr = np.array(greedy_errors, dtype=np.float64)
