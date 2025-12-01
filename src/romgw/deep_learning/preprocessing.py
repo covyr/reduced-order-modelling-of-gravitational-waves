@@ -1,4 +1,10 @@
+import joblib
 import numpy as np
+from pathlib import Path
+
+from sklearn.preprocessing import FunctionTransformer, MinMaxScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 from romgw.typing.core import RealArray
 
@@ -73,7 +79,7 @@ def log_q(X: RealArray) -> RealArray:
     return X_out[0] if X_is_1d else X_out
 
 
-def exp_q(X: RealArray) -> RealArray:
+def inverse_log_q(X: RealArray) -> RealArray:
     """"""
     X = np.asarray(X)
     X_is_1d = False
@@ -84,3 +90,35 @@ def exp_q(X: RealArray) -> RealArray:
 
     X_out = 10**X
     return X_out[0] if X_is_1d else X_out
+
+
+def make_x_scaler(
+    X_raw: RealArray,
+    model_dir: str | Path,
+) -> ColumnTransformer:
+    """"""
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    q_log_transformer = Pipeline([
+        ('log', FunctionTransformer(log_q, inverse_log_q, validate=False)),
+        ('scale', MinMaxScaler())
+    ])
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('q_log', q_log_transformer, [0]),
+        ]
+    )
+    scaler = preprocessor.fit(X_raw)
+    return scaler
+
+
+def make_y_scaler(
+    Y_raw: RealArray,
+    model_dir: str | Path,
+) -> MinMaxScaler:
+    """"""
+    model_dir.mkdir(parents=True, exist_ok=True)
+    
+    preprocessor = MinMaxScaler()
+    scaler = preprocessor.fit(Y_raw)
+    return scaler
