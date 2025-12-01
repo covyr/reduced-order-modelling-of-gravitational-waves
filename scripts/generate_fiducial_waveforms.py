@@ -1,8 +1,8 @@
 from scipy.interpolate import InterpolatedUnivariateSpline
-from typing import Dict, Tuple
 import numpy as np
 import pyseobnr
 import time
+import typer
 
 from romgw.config.env import COMMON_TIME, PROJECT_ROOT
 from romgw.typing.utils import validate_literal
@@ -24,7 +24,6 @@ from romgw.typing.core import (
     MODE_VALUES,
 )
 
-
 def interpolate(
     fiducial_h: ComplexArray,
     fiducial_time: RealArray,
@@ -39,18 +38,18 @@ def interpolate(
     
     Parameters
     ----------
-    fiducial_h : ndarray of shape (n,)
+    fiducial_h : ComplexArray of shape (n,)
         The waveform values defined on the fiducial time grid.
-    fiducial_time : ndarray of shape (n,)
+    fiducial_time : RealArray of shape (n,)
         The time grid on which the waveform is originally defined by
         SEOBNRv5.
-    common_time : ndarray of shape (L,), optional
+    common_time : RealArray of shape (L,), optional
         The target time grid onto which the waveform is interpolated.
         Default is `_COMMON_TIME`.
     
     Returns
     -------
-    common_h : ndarray of shape (L,)
+    common_h : ComplexArray of shape (L,)
         The interpolated waveform defined on the common time grid.
     """
     # Real part.
@@ -65,14 +64,14 @@ def interpolate(
                                             k=5)
     common_h_imag: RealArray = np.asarray(imp_imag(common_time),
                                           dtype=np.float64)
-    # Complex sum.
+
     common_h: ComplexArray = common_h_real + 1j * common_h_imag
     return common_h
 
 
 def generate_seobnrv5_waveform(
     params: PhysicalParams
-) -> Tuple[Dict[str, FullWaveform], ModelStat]:
+) -> tuple[dict[str, FullWaveform], ModelStat]:
     """
     Generate a waveform using SEOBNRv5.
     
@@ -84,16 +83,8 @@ def generate_seobnrv5_waveform(
     
     Parameters
     ----------
-    q : float
-        Mass ratio for the BBH. Must satisfy q >= 1.
-    chi1 : float or ndarray of shape (3,)
-        Dimensionless spin of the more massive BH. For no-spin (NS) and
-        aligned-spin (AS) BBHs, provide the z-component as a float. For
-        precessing (PS) BBHs, provide the full 3D spin vector as an array.
-    chi2 : float or ndarray of shape (3,)
-        Dimensionless spin of the less massive BH. For no-spin (NS) and
-        aligned-spin (AS) BBHs, provide the z-component as a float. For
-        precessing (PS) BBHs, provide the full 3D spin vector as an array.
+    params : PhysicalParams
+        Contains the physical mass ratio and spins of a BBH. 
     
     Returns
     -------
@@ -120,7 +111,6 @@ def generate_seobnrv5_waveform(
         chi1: SpinScalar = params.chi1
         chi2: SpinScalar = params.chi2
 
-    # Generate the waveform modes and time it.
     start = time.perf_counter()
     res = pyseobnr.generate_waveform.generate_modes_opt(
         q=q,
@@ -135,7 +125,6 @@ def generate_seobnrv5_waveform(
     generation_time = end - start
     seobnrv5_time, modes = res[:2]
 
-    # Interpolate modes onto common time grid and make them Waveform instances.
     for mode in modes:
         waveform_arr = interpolate(fiducial_h=modes[mode],
                                    fiducial_time=seobnrv5_time,
@@ -143,7 +132,6 @@ def generate_seobnrv5_waveform(
         waveform = FullWaveform(waveform_arr, params)
         modes[mode] = waveform
 
-    # Make ModelStat instance for the waveform generation.
     stat = ModelStat(approximant=approximant,
                      modes=list(modes.keys()),
                      generation_time=generation_time,
@@ -151,12 +139,19 @@ def generate_seobnrv5_waveform(
 
     return modes, stat
 
+HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
+HELP_DATASET = 'Dataset label: "train" = training data, "test" = testing data.'
+HELP_SAVING = "Whether to save waveforms and their generation stats."
+HELP_VERBOSE = "Enable verbose output."
 
+app = typer.Typer(help="Reduced Order Modelling of Gravitational Waves CLI")
+
+@app.command()
 def main(
-    bbh_spin: BBHSpinType,
-    dataset: DatasetType,
-    saving: bool = False,
-    verbose: bool = False,
+    bbh_spin: BBHSpinType = typer.Option(..., help=HELP_BBH_SPIN),
+    dataset: DatasetType = typer.Option(..., help=HELP_DATASET),
+    saving: bool = typer.Option(False, "--saving/--no-saving", help=HELP_SAVING),
+    verbose: bool = typer.Option(False, "--verbose/--no-verbose", help=HELP_VERBOSE),
 ) -> None:
     """
     Generate fiducial waveforms for a dataset using SEOBNRv5.
@@ -167,16 +162,18 @@ def main(
 
     Parameters
     ----------
-    bbh_spin : {"NS", "AS", "PS"}
-        The complexity regarding the BBH spins. "NS" for no-spin, "AS" for
-        aligned-spin, or "PS" for precessing.
-    dataset : {"train", "test"}
-        The dataset type. "train" for training data (larger) or "test" for
-        testing data (smaller).
-    saving : bool
-        Whether to save/perform filesystem operations or not.
-    verbose : bool
-        Whether to print statements which log progress.
+    bbh_spin : BBHSpinType
+        The complexity regarding the BBH spins. Can be "NS" (no-spin),
+        "AS" (aligned-spin), or "PS" (precessing).
+    dataset : DatasetType
+        The dataset type. Can be "train" (training data)
+        or "test" (testing data).
+    saving : bool, optional
+        If True, empties the relevant directories and saves the waveforms
+        and stats returned by `generate_seobnrv5_waveform` calls.
+        Default is False.
+    verbose : bool, optional
+        If True, prints progress updates. Default is False.
 
     Returns
     -------
@@ -185,8 +182,13 @@ def main(
     See Also
     --------
     generate_seobnrv5_waveform : Generate waveform with SEOBNRv5.
+
+    Examples
+    --------
+    Generate and save the no-spin waveforms for the traininig dataset:
+
+        $ python generate_fiducial_waveforms.py --bbh-spin NS --dataset test --saving
     """
-    # Validate literals. Raises exception if invalid.
     bbh_spin = validate_literal(bbh_spin, BBHSpinType)
     dataset = validate_literal(dataset, DatasetType)
 
@@ -212,11 +214,11 @@ def main(
                     empty_directory(wf_dir)
 
     if verbose:
-        print(f"Fiducial waveform generation for {bbh_spin=}, {dataset=}")
+        typer.echo(f"Fiducial waveform generation for {bbh_spin=}, {dataset=}")
 
     for i, params in enumerate(param_space):
-        if verbose:
-            print(f"Generating waveform {i+1:0{lsM}d}/{M}", end='\r')
+        # if verbose:
+        #     print(f"Generating waveform {i+1:0{lsM}d}/{M}", end='\r')
 
         q: MassRatio = float(params[0])
 
@@ -229,7 +231,6 @@ def main(
         
         physical_params = PhysicalParams(q, chi1, chi2)
         
-        # Generate waveform with fiducial model.
         modes, stat = generate_seobnrv5_waveform(params=physical_params)
 
         if saving:
@@ -255,11 +256,7 @@ def main(
                 phase.to_file(wf_phase_file)
     
     if verbose:
-        print("Waveform generation complete.")
-
+        typer.echo("Waveform generation complete.")
 
 if __name__ == "__main__":
-    main(bbh_spin="NS",
-         dataset="train",
-         saving=True,
-         verbose=True)
+    app()

@@ -1,10 +1,10 @@
 from numpy.typing import NDArray
 import numpy as np
+import typer
 
 from romgw.config.env import PROJECT_ROOT
 from romgw.typing.utils import validate_literal
 from romgw.typing.core import RealArray, BBHSpinType, DatasetType
-
 
 # Sizes of training and test datasets.
 N_TRAIN = 4096
@@ -21,7 +21,6 @@ SPIN_PHI_DOMAIN = (0.0, np.pi)
 # Reproducibility.
 TRAIN_SEEDS = [19, 29, 59, 89, 229, 521, 599, 1129, 1229, 1259, 2591]
 TEST_SEEDS = [2, 73, 179, 283, 419, 547, 661, 811, 947, 1087, 1229]
-
 
 def uniform_random_space(
     n: int,
@@ -50,7 +49,7 @@ def spherpol_to_cartesian(
     return cartesians
 
 
-def generate_param_space(
+def generate_parameter_space(
     bbh_spin: BBHSpinType,
     n: int,
     seeds: list[int] | None = None
@@ -113,31 +112,39 @@ def generate_param_space(
     )
     return param_space
 
+HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
+HELP_DATASET = 'Dataset label: "train" = training data, "test" = testing data.'
+HELP_SAVING = "Whether to save the parameter space."
+HELP_OVERWRITING = "Whether to overwrite a pre-existing parameter space file."
+HELP_VERBOSE = "Enable verbose output."
 
+app = typer.Typer(help="Reduced Order Modelling of Gravitational Waves CLI")
+
+@app.command()
 def main(
-    bbh_spin: BBHSpinType,
-    dataset: DatasetType,
-    n: int | None = None,
-    seeds: list[int] | None = None,
-    saving: bool = False,
-    overwriting: bool = False,
-    verbose: bool = False,
+    bbh_spin: BBHSpinType = typer.Option(..., help=HELP_BBH_SPIN),
+    dataset: DatasetType = typer.Option(..., help=HELP_DATASET),
+    saving: bool = typer.Option(False, help=HELP_SAVING),
+    overwriting: bool = typer.Option(False, help=HELP_OVERWRITING),
+    verbose: bool = typer.Option(False, help=HELP_VERBOSE),
 ) -> None:
-    """"""
-    # Validate literals. Raises exception if invalid.
+    """
+    Examples
+    --------
+    Generate and save the no-spin parameter space for the training dataset:
+
+        $ python generate_parameter_space.py --bbh-spin NS --dataset train --saving
+    """
     bbh_spin = validate_literal(bbh_spin, BBHSpinType)
     dataset = validate_literal(dataset, DatasetType)
     
-    if not n:
-        n = N_TRAIN if dataset == "train" else N_TEST
-    
-    if not seeds:
-        seeds = TRAIN_SEEDS if dataset == "train" else TEST_SEEDS
+    n = N_TRAIN if dataset == "train" else N_TEST
+    seeds = TRAIN_SEEDS if dataset == "train" else TEST_SEEDS
 
     if verbose:
-        print(f"Generating parameter space for {bbh_spin=}, {dataset=}.")
+        typer.echo(f"Generating parameter space: {bbh_spin=}, {dataset=}")
 
-    param_space = generate_param_space(bbh_spin, n, seeds)
+    param_space = generate_parameter_space(bbh_spin, n, seeds)
 
     if saving:
         save_dir = PROJECT_ROOT / "data" / bbh_spin / dataset
@@ -149,12 +156,7 @@ def main(
         np.save(param_space_file, param_space)
     
     if verbose:
-        print(f"Parameter space generation complete.")
-
+        typer.echo(f"Parameter space generation complete.")
 
 if __name__ == "__main__":
-    main(bbh_spin="NS",
-         dataset="train",
-         saving=True,
-         overwriting=False,
-         verbose=True)
+    app()
