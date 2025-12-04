@@ -4,33 +4,18 @@ import matplotlib.pyplot as plt
 
 from romgw.config.env import COMMON_TIME
 from romgw.maths.core import mismatch
+from romgw.typing.core import ComponentType
 from romgw.waveform.base import FullWaveform
 from romgw.waveform.dataset import FullWaveformDataset
 
-
-mpl.rcParams.update({
-    # Colours
-    "figure.facecolor"  : "#0E191E", # Entire figure background
-    "axes.facecolor"    : "#0E191E", # Plot (axes) background
-    "savefig.facecolor" : "#0E191E", # Background in saved figures
-    "axes.edgecolor"    : "white",
-    "axes.labelcolor"   : "white",
-    "xtick.color"       : "white",
-    "ytick.color"       : "white",
-    "text.color"        : "white",
-    "axes.titlecolor"   : "white",
-    "grid.color"        : "white", # Optional: faint grid
-    
-    # Other formatting
-    "lines.linewidth"   : 1,
-})
-
+from romgw.plotting.custom_config import RC_PARAMS
+mpl.rcParams.update(RC_PARAMS)
 
 def plot_same_mode(
     waveforms: FullWaveformDataset,
     verbose:bool = False,
 ) -> None:
-    """Look into how the parameters affect the waveforms."""
+    """Look into how parameters affect the fiducial waveforms."""
     if isinstance(waveforms, FullWaveform):
         waveforms = [waveforms]
     elif not isinstance(waveforms, FullWaveformDataset):
@@ -87,7 +72,7 @@ def plot_same_mode(
 def plot_same_params(
     modes: dict[str, FullWaveform],
 ) -> None:
-    """Look into how the waveforms differ across the modes."""
+    """Look into how the fiducial waveforms differ across modes."""
     fig = plt.figure(figsize=(12, 9 + 1/3))
     spec = gridspec.GridSpec(
         ncols=1,
@@ -124,9 +109,17 @@ def plot_same_params(
 def plot_mismatch(
     fiducial_waveforms: FullWaveformDataset,
     surrogate_waveforms: FullWaveformDataset,
+    component: ComponentType | None = None,
 ) -> None:
-    """Compare fiducial waveforms to their surrogate counterparts."""
+    """Look into accuracy of reduced order model compared to fiducial."""
     n = len(fiducial_waveforms)
+
+    for i in range(n):
+        if not fiducial_waveforms[i].params == surrogate_waveforms[i].params:
+            raise ValueError(f"Fiducial and surrogate are modelling"
+                             f"different waveforms:\n"
+                             f"fiducial : {fiducial_waveforms[i].params}\n"
+                             f"surrogate: {surrogate_waveforms[i].params}")
 
     fig = plt.figure(figsize=(12, 3*n))
     spec = gridspec.GridSpec(
@@ -139,16 +132,25 @@ def plot_mismatch(
     )
 
     axs = []
-
     for i in range(n):
         ax = fig.add_subplot(spec[i])
         axs.append(ax)
         
-        wf_fid = fiducial_waveforms[i].real
-        wf_sur = surrogate_waveforms[i].real
+        if not component:
+            ylabel = "full waveform"
+            wf_fid = fiducial_waveforms[i]
+            wf_sur = surrogate_waveforms[i]
+        elif component == "amplitude":
+            ylabel = "waveform amplitude"
+            wf_fid = fiducial_waveforms[i].amplitude
+            wf_sur = surrogate_waveforms[i].amplitude
+        elif component == "phase":
+            ylabel = "waveform phase"
+            wf_fid = fiducial_waveforms[i].phase
+            wf_sur = surrogate_waveforms[i].phase
 
-        ax.plot(COMMON_TIME, wf_fid, label="fiducial")
-        ax.plot(COMMON_TIME, wf_sur, label="surrogate", linestyle='--')
+        ax.plot(COMMON_TIME, wf_fid.real, label="fiducial")
+        ax.plot(COMMON_TIME, wf_sur.real, label="surrogate", linestyle='--')
 
         x_text = (xmin := ax.get_xlim()[0]) + 0.05*(ax.get_xlim()[1] - xmin)
         y_text = (ymin := ax.get_ylim()[0]) + 0.05*(ax.get_ylim()[1] - ymin)
@@ -158,7 +160,7 @@ def plot_mismatch(
         
         ax.set_xlim(-5000, 250)
         ax.set_xlabel("time")
-        ax.set_ylabel(f"full waveform")
+        ax.set_ylabel(ylabel)
         ax.set_title(f"{fiducial_waveforms[i].params}")
 
     plt.show()

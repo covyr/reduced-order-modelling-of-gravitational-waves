@@ -148,6 +148,14 @@ def reduced_basis(
     # Initial residual norms.
     errors = np.array([mag2(r, time) for r in residuals])
 
+    # TEMP: TESTING WHETHER NORMALISING AT THE START IMPROVES ORTHONORMALITY
+    temp = np.argmax(errors)
+    errors = np.concatenate((errors[:temp], np.array([1.0]), errors[temp+1:]))
+    residuals: list[ComponentWaveform] = [
+        rewrap_like(wf, normalise(wf.copy(), time, zero_tol))
+        for wf in waveforms._waveforms
+    ]
+
     # Greedy algorithm.
     while True:
         idx = int(np.argmax(errors))
@@ -204,7 +212,36 @@ def reduced_basis(
             print(f"m={len(rb):0{lsM}d}/{M}, "
                   f"greedy error={max_err:.2e}", end='\r')
 
-    greedy_errors[0] = 1  # by definition
+    greedy_errors[0] = 1.0  # by definition
     greedy_errors_arr = np.array(greedy_errors, dtype=np.float64)
 
     return rb, greedy_errors_arr
+
+def mgs(waveforms: ComponentWaveformDataset) -> ComponentWaveformDataset:
+    """"""
+    if len(waveforms) == 0:
+        raise ValueError("No waveforms to orthonormalise.")
+    
+    # Defensive copy of residuals (create independent waveform instances).
+    residuals: list[ComponentWaveform] = [
+        rewrap_like(wf, wf.copy())
+        for wf in waveforms._waveforms
+    ]
+    
+    # Extract component value from residuals.
+    component = str(residuals[0].component)
+
+    orthonormed: list[ComponentWaveform] = [normalise(residuals.pop(0))]
+    while True:
+        if len(residuals) == 0:
+            return ComponentWaveformDataset(orthonormed, component=component)
+
+        for i in range(len(residuals)):
+            residual_arr = (
+                residuals[i] - (dot(residuals[i], orthonormed[-1])
+                                * orthonormed[-1]
+                                / mag2(orthonormed[-1])))
+            residuals[i] = rewrap_like(residuals[i], residual_arr)
+
+        orthonormed.append(normalise(residuals.pop(0)))
+    

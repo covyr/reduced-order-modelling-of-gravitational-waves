@@ -65,7 +65,7 @@ def interpolate(
     common_h_imag: RealArray = np.asarray(imp_imag(common_time),
                                           dtype=np.float64)
 
-    common_h: ComplexArray = common_h_real + 1j * common_h_imag
+    common_h: ComplexArray = common_h_real + (1j * common_h_imag)
     return common_h
 
 
@@ -101,6 +101,7 @@ def generate_seobnrv5_waveform(
     """
     precessing = False if np.ndim(params.chi1) == 0 else True
     approximant = "SEOBNRv5HM" if not precessing else "SEOBNRv5PHM"
+    common_time: RealArray = COMMON_TIME
 
     q: MassRatio = params.q
 
@@ -128,7 +129,7 @@ def generate_seobnrv5_waveform(
     for mode in modes:
         waveform_arr = interpolate(fiducial_h=modes[mode],
                                    fiducial_time=seobnrv5_time,
-                                   common_time=COMMON_TIME)
+                                   common_time=common_time)
         waveform = FullWaveform(waveform_arr, params)
         modes[mode] = waveform
 

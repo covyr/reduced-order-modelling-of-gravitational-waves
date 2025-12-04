@@ -113,7 +113,7 @@ class BaseWaveform(np.ndarray):
     
 
 # ----------------------------------------------
-# COMPONENT WAVEFORM (Amplitude / Phase)
+# COMPONENT WAVEFORM
 # ----------------------------------------------
 class ComponentWaveform(BaseWaveform):
     """Real-valued waveform component (amplitude or phase)."""
@@ -209,10 +209,8 @@ class FullWaveform(BaseWaveform):
                 f"Amplitude and phase must be components of the same waveform."
             )
 
-        waveform_arr: ComplexArray = (
-            np.asarray(amplitude) * np.asarray(np.exp(-1j * phase))
-        )
-        params = amplitude.params  # identical params
+        waveform_arr: ComplexArray = amplitude * np.exp(-1j * phase)
+        params: PhysicalParams = amplitude.params  # identical params
         return cls(waveform_arr, params)
     
     # ----- Properties -----

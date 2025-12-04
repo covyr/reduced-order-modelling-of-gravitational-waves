@@ -37,6 +37,9 @@ class BaseWaveformDataset:
     def remove_waveform(self, idx: int) -> None:
         del self._waveforms[idx]
 
+    def pop(self, idx: int | None = None) -> BaseWaveform:
+        return self._waveforms.pop(idx)
+
     # ----- Basic accessors -----
     def __len__(self) -> int:
         return len(self._waveforms)
@@ -49,9 +52,9 @@ class BaseWaveformDataset:
 
     # ----- Properties -----
     @property
-    def shape(self) -> tuple[int, ...]:
-        """Shape of individual waveform arrays (assumed consistent)."""
-        return self._waveforms[0].shape
+    def shape(self) -> tuple[int]:
+        """Shape of the dataset."""
+        return (len(self._waveforms), len(self._waveforms[0]))
 
     @property
     def params_list(self) -> list[PhysicalParams]:
@@ -66,7 +69,7 @@ class BaseWaveformDataset:
 
     @property
     def params_array(self) -> RealArray:
-        """"""
+        """Array of PhysicalParam values across all waveforms."""
         params_list = []
         for wf in self._waveforms:
             params = wf.params
@@ -155,20 +158,6 @@ class ComponentWaveformDataset(BaseWaveformDataset):
         component: ComponentType = "n/a",
     ):
         """"""
-        # waveforms = list(waveforms)
-        # if not all(isinstance(wf, ComponentWaveform) for wf in waveforms):
-        #     raise TypeError("All waveforms must be ComponentWaveform "
-        #                     "instances.")
-        # if not waveforms:
-        #     raise ValueError("Dataset cannot be empty.")
-
-        # # Infer component type (must be consistent)
-        # component_types = {wf.component for wf in waveforms}
-        # if len(component_types) != 1:
-        #     raise ValueError(f"Inconsistent component types found: "
-        #                      f"{component_types}")
-        # self.component = component_types.pop()
-
         waveforms = list(waveforms) or []
         self.component = component
 
@@ -186,7 +175,7 @@ class ComponentWaveformDataset(BaseWaveformDataset):
     def __repr__(self) -> str:
         return (
             f"<ComponentWaveformDataset[{self.component}]("
-            f"n={len(self)}, shape={self.shape})>"
+            f"n={len(self)}, L={self.shape})>"
         )
 
 
@@ -208,4 +197,4 @@ class FullWaveformDataset(BaseWaveformDataset):
         return FullWaveform.from_file(path)
 
     def __repr__(self) -> str:
-        return f"<FullWaveformDataset(n={len(self)}, shape={self.shape})>"
+        return f"<FullWaveformDataset(n={len(self)}, L={self.shape})>"

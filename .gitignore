@@ -25,6 +25,3 @@ dist/
 
 # Data
 data/
-
-# Models: un-ignore once you have complete models
-models/

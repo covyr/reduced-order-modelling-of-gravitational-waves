@@ -5,6 +5,7 @@ from pycbc import psd as pypsd
 from pycbc.types import TimeSeries
 
 from romgw.config.env import COMMON_TIME, ZERO_TOL
+from romgw.waveform.dataset import ComponentWaveformDataset
 from romgw.waveform.utils import rewrap_like
 from romgw.waveform.typing import WaveformT
 
@@ -72,10 +73,10 @@ def mismatch(h1: WaveformT, h2: WaveformT, M_sol:int = 50) -> float:
 
     # Make both arrays equal length (zero pad).
     N = max(len(h1), len(h2))
-    if len(h1) < N:
-        h1 = np.pad(h1, (0, N - len(h1)))
-    if len(h2) < N:
-        h2 = np.pad(h2, (0, N - len(h2)))
+    # if len(h1) < N:
+    #     h1 = np.pad(h1, (0, N - len(h1)))
+    # if len(h2) < N:
+    #     h2 = np.pad(h2, (0, N - len(h2)))
 
     # Construct TimeSeries objects.
     h1_ts = TimeSeries(h1.real, delta_t=dt)

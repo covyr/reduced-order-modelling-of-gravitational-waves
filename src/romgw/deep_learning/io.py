@@ -44,7 +44,7 @@ def load_raw_training_data(
     X_raw = waveforms.params_array
     Y_raw = waveforms.array[:, empirical_time_nodes]
 
-    return (X_raw[:, :1], Y_raw[:, :1]) if bbh_spin == "NS" else (X_raw, Y_raw)
+    return (X_raw[:, :1], Y_raw) if bbh_spin == "NS" else (X_raw, Y_raw)
 
 
 @overload
@@ -57,6 +57,8 @@ def save_scaler(
     model_dir: str | Path
 ) -> None:
     """"""
+    model_dir = Path(model_dir)
+    model_dir.mkdir(parents=True, exist_ok=True)
     scaler_file = model_dir / f"{x_or_y}_scaler.gz"
     joblib.dump(scaler, scaler_file)
 

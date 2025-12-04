@@ -1,4 +1,3 @@
-import joblib
 import numpy as np
 from pathlib import Path
 
@@ -6,7 +5,8 @@ from sklearn.preprocessing import FunctionTransformer, MinMaxScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 
-from romgw.typing.core import RealArray
+from romgw.typing.core import RealArray, BBHSpinType
+from romgw.typing.utils import validate_literal
 
 def train_val_split(
     X: RealArray,
@@ -93,11 +93,10 @@ def inverse_log_q(X: RealArray) -> RealArray:
 
 
 def make_x_scaler(
-    X_raw: RealArray,
-    model_dir: str | Path,
+    bbh_spin: BBHSpinType,
 ) -> ColumnTransformer:
     """"""
-    model_dir.mkdir(parents=True, exist_ok=True)
+    bbh_spin = validate_literal(bbh_spin, BBHSpinType)
 
     q_log_transformer = Pipeline([
         ('log', FunctionTransformer(log_q, inverse_log_q, validate=False)),
@@ -108,17 +107,25 @@ def make_x_scaler(
             ('q_log', q_log_transformer, [0]),
         ]
     )
-    scaler = preprocessor.fit(X_raw)
+    
+    if bbh_spin == "NS":
+        param_domain = np.array([[1.0],
+                                 [10.0]], dtype=np.float64)
+    elif bbh_spin == "AS":
+        param_domain = np.array([[1.0, -1.0],
+                                 [10.0, 1.0]], dtype=np.float64)
+    else:  # if bbh_spin == "PS"
+        param_domain = np.array([[1.0, -1.0, -1.0, -1.0],
+                                 [10.0, 1.0, 1.0, 1.0]], dtype=np.float64)
+        
+    scaler = preprocessor.fit(param_domain)
     return scaler
 
 
 def make_y_scaler(
     Y_raw: RealArray,
-    model_dir: str | Path,
 ) -> MinMaxScaler:
     """"""
-    model_dir.mkdir(parents=True, exist_ok=True)
-    
     preprocessor = MinMaxScaler()
     scaler = preprocessor.fit(Y_raw)
     return scaler

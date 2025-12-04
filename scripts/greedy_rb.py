@@ -2,14 +2,14 @@ import numpy as np
 import typer
 
 from romgw.config.env import COMMON_TIME, PROJECT_ROOT
-from romgw.maths.rb import reduced_basis
+from romgw.maths.rb import reduced_basis, mgs, gram_matrix
 from romgw.typing.core import RealArray, BBHSpinType, ModeType, ComponentType, DatasetType
 from romgw.typing.utils import validate_literal
 from romgw.utils.filesystem import empty_directory
 from romgw.waveform.dataset import ComponentWaveformDataset
 
 DATASET: DatasetType = "train"
-COMPONENT_TOLERANCE_DICT = {"amplitude": 1e-12, "phase": 1e-10}
+COMPONENT_TOLERANCE_DICT = {"amplitude": 1e-12, "phase": 1e-14}
 
 HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
 HELP_MODE = 'Spin-weighted spherical harmonic label (l, m): "2,2", "2,1", "3,2", "3,3", "4,4", or "4,3".'
@@ -71,22 +71,37 @@ def main(
     mode = validate_literal(mode, ModeType)
     component = validate_literal(component, ComponentType)
 
+    tolerance: float = COMPONENT_TOLERANCE_DICT[component]
     time: RealArray = COMMON_TIME
+    data_dir = PROJECT_ROOT / "data" / bbh_spin / "train" / mode / component
 
     if verbose:
         typer.echo(f"Finding reduced basis for "
-                   f"{bbh_spin=}, {mode=}, {component=}")
-    
-    data_dir = PROJECT_ROOT / "data" / bbh_spin / "train" / mode / component
+                   f"{bbh_spin=}, {mode=}, {component=}, {tolerance=}")
     
     raw_wf_dir = data_dir / "raw"
     waveforms = ComponentWaveformDataset.from_directory(raw_wf_dir,
                                                         component=component)
     
     rb, errs = reduced_basis(waveforms,
-                             tolerance=COMPONENT_TOLERANCE_DICT[component],
+                             tolerance=tolerance,
                              time=time,
                              verbose=verbose)
+
+    rb = mgs(rb)  # for extra safe orthonormalisation
+
+    if verbose:
+        G = gram_matrix(rb, time)
+        print(f"Gram matrix:")
+        diag_mean = float(np.diagonal(G).mean())
+        diag_min = float(np.diagonal(G).min())
+        off_diag_mean = (float(np.sum(np.sum(G))) - (len(G) * diag_mean)) / (G.size - len(G))
+        off_diag_max = float((G - G*np.identity(len(G))).max())
+        print(f">>> diagonal mean: {diag_mean:.6e}\n"
+              f">>> diagonal min : {diag_min:.6e}\n"
+              f">>> off-diag mean: {off_diag_mean:.6e}\n"
+              f">>> off_diag max : {off_diag_max:.6e}")
+
     if verbose:
         typer.echo("Greedy reduced basis element selection complete.")
     

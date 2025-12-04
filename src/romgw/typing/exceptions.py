@@ -1,6 +1,5 @@
 from typing import Any
 
-from romgw.typing.core import SpinScalar, SpinVector, Spin
 from romgw.typing.helpers import literal_values
 
 

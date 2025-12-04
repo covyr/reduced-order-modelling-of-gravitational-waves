@@ -26,7 +26,7 @@ class PhysicalParams:
     """
     q: MassRatio
     chi1: Spin
-    chi2: Spin
+    chi2: Spin  
 
     def __post_init__(self):
         # Validate each field.
@@ -58,6 +58,27 @@ class PhysicalParams:
         return params_array
 
     def __str__(self) -> str:
+        _str = lambda x: (f"{x:.6f}" if float(x) != 0 else "0.      ")
+        
+        q_str = _str(self.q)
+        if np.ndim(self.chi1) != 0:
+            chi1_str = "[ " + " ".join([_str(x) for x in self.chi1]) + " ]"
+            chi2_str = "[ " + " ".join([_str(x) for x in self.chi2]) + " ]"
+        
+        else:
+            chi1_str = (
+                "[ " + " ".join([_str(x) for x in [0, 0, self.chi1]]) + " ]"
+            )
+            chi2_str = (
+                "[ " + " ".join([_str(x) for x in [0, 0, self.chi2]]) + " ]"
+            )
+
+        return (
+            f"PhysicalParams"
+            f"(q={q_str}, chi1={chi1_str}, chi2={chi2_str})"
+        )
+
+    def __repr__(self) -> str:
         _str = lambda x: (f"{x:.6f}" if float(x) != 0 else "0.      ")
         
         q_str = _str(self.q)
