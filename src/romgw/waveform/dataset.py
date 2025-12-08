@@ -175,7 +175,7 @@ class ComponentWaveformDataset(BaseWaveformDataset):
     def __repr__(self) -> str:
         return (
             f"<ComponentWaveformDataset[{self.component}]("
-            f"n={len(self)}, L={self.shape})>"
+            f"n={self.shape[0]}, L={self.shape[1]})>"
         )
 
 
@@ -197,4 +197,4 @@ class FullWaveformDataset(BaseWaveformDataset):
         return FullWaveform.from_file(path)
 
     def __repr__(self) -> str:
-        return f"<FullWaveformDataset(n={len(self)}, L={self.shape})>"
+        return f"<FullWaveformDataset(n={self.shape[0]}, L={self.shape[1]})>"

@@ -20,8 +20,6 @@ from sklearn.preprocessing import MinMaxScaler
 from typing import Literal
 
 from romgw.config.env import PROJECT_ROOT
-from romgw.waveform.base import FullWaveform, ComponentWaveform
-from romgw.waveform.params import PhysicalParams
 from romgw.typing.core import (
     RealArray,
     ComplexArray,
@@ -81,6 +79,18 @@ class ComponentROM:
         h_nodes = self.waveform_scaler.inverse_transform(h_nodes_scaled)
         return (self.interpolation_matrix @ h_nodes.T).T
 
+    def generate_mode_component_generalised(
+        self,
+        params_arr: RealArray
+    ) -> ComplexArray:
+        """"""
+        generating_one_waveform = True if params_arr.ndim == 1 else False
+        params_arr = params_arr[np.newaxis, :] if generating_one_waveform else params_arr
+        params_scaled = self.param_scaler.transform(params_arr)
+        h_nodes_scaled = self.model.predict(params_scaled, verbose=0).astype(np.float64)
+        h_nodes = self.waveform_scaler.inverse_transform(h_nodes_scaled)
+        return (self.interpolation_matrix @ h_nodes.T).T
+
     def __repr__(self) -> str:
         return (f"<ComponentROM>(name={self.name}, "
                 f"bbh_spin={self.bbh_spin}, "
@@ -125,6 +135,17 @@ class ModeROM:
         return amp_arr * np.exp(-1j * phi_arr)
     
     def generate_mode_vectorised(
+        self,
+        params_arr: RealArray,
+    ) -> RealArray:
+        """"""
+        amp_arr = (self.component_models["amplitude"]
+                       .generate_mode_component_vectorised(params_arr))
+        phi_arr = (self.component_models["phase"]
+                       .generate_mode_component_vectorised(params_arr))
+        return amp_arr * np.exp(-1j * phi_arr)
+    
+    def generate_mode_generalised(
         self,
         params_arr: RealArray,
     ) -> RealArray:
@@ -186,7 +207,28 @@ class ROMGW:
             {mode_key: mode_val[i] for mode_key, mode_val in modes_arr.items()}
             for i in range(len(params_arr))
         ]
-    
+
+    def generate_modes_generalised(
+        self,
+        params_arr: RealArray
+    ) -> list[dict[ModeType, RealArray]] | dict[ModeType, RealArray]:
+        """"""
+        modes_arr = {m: mode_model.generate_mode_vectorised(params_arr)
+                        for m, mode_model in self.mode_models.items()}
+        
+        generating_one_waveform = True if params_arr.ndim == 1 else False
+        if generating_one_waveform:
+            return modes_arr
+        
+        modes = []
+        for i in range(len(params_arr)):
+            modes.append({mode_key: mode_val[i]
+                          for mode_key, mode_val in modes_arr.items()})
+        return [
+            {mode_key: mode_val[i] for mode_key, mode_val in modes_arr.items()}
+            for i in range(len(params_arr))
+        ]
+
     def __repr__(self) -> str:
         return (f"<ROMGW>(name={self.name}, "
                 f"bbh_spin={self.bbh_spin}, "
