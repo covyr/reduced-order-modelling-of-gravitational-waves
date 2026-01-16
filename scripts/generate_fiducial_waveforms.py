@@ -4,8 +4,9 @@ import pyseobnr
 import time
 import typer
 
-from romgw.config.env import COMMON_TIME, PROJECT_ROOT
-from romgw.typing.utils import validate_literal
+from romgw.config.constants import COMMON_TIME, PROJECT_ROOT, MODE_VALUES
+# from romgw.typing.utils import validate_literal
+from romgw.config.validation import validate_literal
 from romgw.utils.filesystem import empty_directory
 from romgw.waveform.params import PhysicalParams
 from romgw.waveform.stat import ModelStat
@@ -13,7 +14,17 @@ from romgw.waveform.base import (
     ComponentWaveform,
     FullWaveform,
 )
-from romgw.typing.core import (
+# from romgw.typing.core import (
+#     RealArray,
+#     ComplexArray,
+#     MassRatio,
+#     SpinScalar,
+#     SpinVector,
+#     BBHSpinType,
+#     DatasetType,
+#     MODE_VALUES,
+# )
+from romgw.config.types import (
     RealArray,
     ComplexArray,
     MassRatio,
@@ -21,7 +32,6 @@ from romgw.typing.core import (
     SpinVector,
     BBHSpinType,
     DatasetType,
-    MODE_VALUES,
 )
 
 def interpolate(
@@ -141,7 +151,7 @@ def generate_seobnrv5_waveform(
     return modes, stat
 
 HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
-HELP_DATASET = 'Dataset label: "train" = training data, "test" = testing data.'
+HELP_DATASET = 'Dataset label: "train_xl" = xl training data, "train" = training data, "test" = testing data.'
 HELP_SAVING = "Whether to save waveforms and their generation stats."
 HELP_VERBOSE = "Enable verbose output."
 
@@ -207,8 +217,9 @@ def main(
         stat_dir.mkdir(parents=True, exist_ok=True)
         empty_directory(stat_dir)
 
+        mode_values = MODE_VALUES[bbh_spin]
         for path in dataset_dir.iterdir():
-            if path.is_dir() and path.name in MODE_VALUES:
+            if path.is_dir() and path.name in mode_values:
                 for component in ("full", "amplitude", "phase"):
                     wf_dir = path / component / "raw"
                     wf_dir.mkdir(parents=True, exist_ok=True)

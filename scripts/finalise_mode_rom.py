@@ -15,19 +15,45 @@ import typer
 from pathlib import Path
 from typing import Literal
 
-from romgw.config.env import PROJECT_ROOT
-from romgw.typing.core import (
-    BBHSpinType,
-    ModeType,
+from romgw.config.constants import PROJECT_ROOT, MODE_VALUES
+# from romgw.typing.core import (
+#     BBHSpinType,
+#     ModeType,
+# )
+from romgw.config.types import BBHSpinType, DatasetType, ModeType, ModelNameType
+from romgw.config.validation import (
+    validate_literal,
+    validate_dependent_literal
 )
 
 def working_model_files(
     bbh_spin: BBHSpinType,
+    dataset: DatasetType,
     mode: ModeType,
-    model_name: Literal["NonLinRegV1"],
+    model_name: ModelNameType,
 ) -> dict[str, Path]:
     """"""
-    mode_dir = PROJECT_ROOT / "data" / bbh_spin / "train" / mode
+    bbh_spin = validate_literal(
+        value=bbh_spin,
+        literal_type=BBHSpinType,
+    )
+    dataset = validate_literal(
+        value=dataset,
+        literal_type=DatasetType,
+    )
+    mode = validate_dependent_literal(
+        value=mode,
+        literal_type=ModeType,
+        parent_value=bbh_spin,
+        parent_literal_type=BBHSpinType,
+        dependency_map=MODE_VALUES,
+    )
+    model_name = validate_literal(
+        value=model_name,
+        literal_type=ModelNameType,
+    )
+
+    mode_dir = PROJECT_ROOT / "data" / bbh_spin / dataset / mode
 
     param_scaler = (mode_dir / "amplitude" / "models" / model_name /
                     "x_scaler.gz")
@@ -49,13 +75,34 @@ def working_model_files(
 
 def final_model_files(
     bbh_spin: BBHSpinType,
+    dataset: DatasetType,
     mode: ModeType,
-    model_name: Literal["NonLinRegV1"],
+    model_name: ModelNameType,
 ) -> dict[str, Path]:
     """"""
+    bbh_spin = validate_literal(
+        value=bbh_spin,
+        literal_type=BBHSpinType,
+    )
+    dataset = validate_literal(
+        value=dataset,
+        literal_type=DatasetType,
+    )
+    mode = validate_dependent_literal(
+        value=mode,
+        literal_type=ModeType,
+        parent_value=bbh_spin,
+        parent_literal_type=BBHSpinType,
+        dependency_map=MODE_VALUES,
+    )
+    model_name = validate_literal(
+        value=model_name,
+        literal_type=ModelNameType,
+    )
+
     param_scaler = PROJECT_ROOT / "models" / "x_scaler.gz"
     
-    model_dir = PROJECT_ROOT / "models" / bbh_spin / model_name / mode
+    model_dir = PROJECT_ROOT / "models" / bbh_spin / dataset / model_name / mode
 
     model = lambda c: model_dir / c / "model.keras"
     waveform_scaler = lambda c: model_dir / c / "y_scaler.gz"
@@ -113,6 +160,7 @@ def finalise_model_files(
             allow_pickle=False)
 
 HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
+HELP_DATASET = 'Dataset label: "train_xl" = xl training data, "train" = training data, "test" = testing data.'
 HELP_MODE = 'Spin-weighted spherical harmonic label (l, m): "2,2", "2,1", "3,2", "3,3", "4,4", or "4,3".'
 HELP_MODEL_NAME = 'Name of the model: "NonLinRegV1"'
 HELP_VERBOSE = "Enable verbose output."
@@ -122,26 +170,47 @@ app = typer.Typer(help="Reduced Order Modelling of Gravitational Waves CLI")
 @app.command()
 def main(
     bbh_spin: BBHSpinType = typer.Option(..., help=HELP_BBH_SPIN),
+    dataset: DatasetType = typer.Option(..., help=HELP_DATASET),
     mode: ModeType = typer.Option(..., help=HELP_MODE),
-    model_name: Literal["NonLinRegV1"] = typer.Option(..., help=HELP_MODEL_NAME),
+    model_name: ModelNameType = typer.Option(..., help=HELP_MODEL_NAME),
     verbose: bool = typer.Option(False, "--verbose/--no-verbose", help=HELP_VERBOSE),
 ) -> None:
     """
     Examples
     --------
     Finalise the NonLinRegV1 reduced order model for the 2,2 mode
-    of the GW produced by the merger of an NS BBH:
+    of the GW produced by the merger of an NS BBH for the training set:
 
-        $ finalise_mode_rom.py --bbh-spin NS --mode 2,2 --model-name NonLinRegV1
+        $ finalise_mode_rom.py --bbh-spin NS --dataset train --mode 2,2 --model-name NonLinRegV1
     """
-    working_files = working_model_files(bbh_spin, mode, model_name)
+    bbh_spin = validate_literal(
+        value=bbh_spin,
+        literal_type=BBHSpinType,
+    )
+    dataset = validate_literal(
+        value=dataset,
+        literal_type=DatasetType,
+    )
+    mode = validate_dependent_literal(
+        value=mode,
+        literal_type=ModeType,
+        parent_value=bbh_spin,
+        parent_literal_type=BBHSpinType,
+        dependency_map=MODE_VALUES,
+    )
+    model_name = validate_literal(
+        value=model_name,
+        literal_type=ModelNameType,
+    )
+
+    working_files = working_model_files(bbh_spin, dataset, mode, model_name)
     if verbose:
         typer.echo("working files:")
         for object, file in working_files.items():
             typer.echo(f"  {object}:\n    {file}")
         typer.echo("")
 
-    final_files = final_model_files(bbh_spin, mode, model_name)
+    final_files = final_model_files(bbh_spin, dataset, mode, model_name)
     if verbose:
         typer.echo("finalised files:")
         for object, file in final_files.items():

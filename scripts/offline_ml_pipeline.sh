@@ -17,14 +17,18 @@ COMPONENTS="amplitude phase"
 #  Parse CLI arguments
 ###############################################
 usage() {
-    echo "Usage: $0 --spin <value> --mode <value> --model-name <value>"
+    echo "Usage: $0 --bbh-spin <value> --dataset <value> --mode <value> --model-name <value>"
     exit 1
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --spin)
-            SPIN="$2"
+        --bbh-spin)
+            BBH_SPIN="$2"
+            shift 2
+            ;;
+        --dataset)
+            DATASET="$2"
             shift 2
             ;;
         --mode)
@@ -46,7 +50,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required flags
-if [[ -z "$SPIN" || -z "$MODE" || -z "$MODEL_NAME" ]]; then
+if [[ -z "$BBH_SPIN" || -z "$DATASET" || -z "$MODE" || -z "$MODEL_NAME" ]]; then
     usage
 fi
 
@@ -55,7 +59,8 @@ fi
 ###############################################
 echo "PROJECT_ROOT detected as: $PROJECT_ROOT"
 echo "Running pipeline with:"
-echo "  spin:       $SPIN"
+echo "  bbh-spin:   $BBH_SPIN"
+echo "  dataset:    $DATASET"
 echo "  mode:       $MODE"
 echo "  components: $COMPONENTS"
 echo "  model-name: $MODEL_NAME"
@@ -64,7 +69,8 @@ echo ""
 for COMP in $COMPONENTS; do
     echo "=== train_ann: component=$COMP ==="
     $PYTHON "$PROJECT_ROOT/scripts/train_ann.py" \
-        --bbh-spin "$SPIN" \
+        --bbh-spin "$BBH_SPIN" \
+        --dataset "$DATASET" \
         --mode "$MODE" \
         --component "$COMP" \
         --model-name "$MODEL_NAME" \
@@ -74,7 +80,8 @@ done
 
 echo "=== finalise_mode_rom ==="
 $PYTHON "$PROJECT_ROOT/scripts/finalise_mode_rom.py" \
-    --bbh-spin "$SPIN" \
+    --bbh-spin "$BBH_SPIN" \
+    --dataset "$DATASET" \
     --mode "$MODE" \
     --model-name "$MODEL_NAME" \
     --verbose

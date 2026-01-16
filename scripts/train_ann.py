@@ -17,13 +17,25 @@ from keras.models import Sequential
 from keras.optimizers import Adam
 from typing import Literal
 
-from romgw.config.env import PROJECT_ROOT
+from romgw.config.constants import PROJECT_ROOT, MODE_VALUES
 from romgw.deep_learning.io import load_raw_training_data, save_scaler, load_scaler
 from romgw.deep_learning.preprocessing import train_val_split, make_x_scaler, make_y_scaler
-from romgw.typing.core import BBHSpinType, ModeType, ComponentType
-from romgw.typing.utils import validate_literal
+# from romgw.typing.core import BBHSpinType, ModeType, ComponentType
+from romgw.config.types import (
+    BBHSpinType,
+    DatasetType,
+    ModeType,
+    ComponentType,
+    ModelNameType
+)
+# from romgw.typing.utils import validate_literal
+from romgw.config.validation import (
+    validate_literal,
+    validate_dependent_literal,
+)
 
 HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
+HELP_DATASET = 'Dataset label: "train_xl" = xl training data, "train" = training data, "test" = testing data.'
 HELP_MODE = 'Spin-weighted spherical harmonic label (l, m): "2,2", "2,1", "3,2", "3,3", "4,4", or "4,3".'
 HELP_COMPONENT = 'Waveform component: "amplitude" or "phase".'
 HELP_MODEL_NAME = 'Name of the model: "NonLinRegV1"'
@@ -35,9 +47,10 @@ app = typer.Typer(help="Reduced Order Modelling of Gravitational Waves CLI")
 @app.command()
 def main(
     bbh_spin: BBHSpinType = typer.Option(..., help=HELP_BBH_SPIN),
+    dataset: DatasetType = typer.Option(..., help=HELP_DATASET),
     mode: ModeType = typer.Option(..., help=HELP_MODE),
     component: ComponentType = typer.Option(..., help=HELP_COMPONENT),
-    model_name: Literal["NonLinRegV1"] = typer.Option(..., help=HELP_MODEL_NAME),
+    model_name: ModelNameType = typer.Option(..., help=HELP_MODEL_NAME),
     saving: bool = typer.Option(False, "--saving/--no-saving", help=HELP_SAVING),
     verbose: bool = typer.Option(False, "--verbose/--no-verbose", help=HELP_VERBOSE),
 ) -> None:
@@ -45,15 +58,35 @@ def main(
     Examples
     --------
     Train and save the NonLinRegV1 ANN for the amplitude of the 2,2 mode
-    of the GW produced by the merger of an NS BBH:
+    of the GW produced by the merger of an NS BBH for the training set:
 
-        $ python train_ann.py --bbh-spin NS --mode 2,2 --component amplitude --model-name NonLinRegV1 --saving
+        $ python train_ann.py --bbh-spin NS --dataset train --mode 2,2 --component amplitude --model-name NonLinRegV1 --saving
     """
-    bbh_spin = validate_literal(bbh_spin, BBHSpinType)
-    mode = validate_literal(mode, ModeType)
-    component = validate_literal(component, ComponentType)
+    bbh_spin = validate_literal(
+        value=bbh_spin,
+        literal_type=BBHSpinType,
+    )
+    dataset = validate_literal(
+        value=dataset,
+        literal_type=DatasetType,
+    )
+    mode = validate_dependent_literal(
+        value=mode,
+        literal_type=ModeType,
+        parent_value=bbh_spin,
+        parent_literal_type=BBHSpinType,
+        dependency_map=MODE_VALUES,
+    )
+    component = validate_literal(
+        value=component,
+        literal_type=ComponentType,
+    )
+    model_name = validate_literal(
+        value=model_name,
+        literal_type=ModelNameType,
+    )
 
-    data_dir = PROJECT_ROOT / "data" / bbh_spin / "train" / mode / component
+    data_dir = PROJECT_ROOT / "data" / bbh_spin / dataset / mode / component
     if not data_dir.is_dir():
         raise NotADirectoryError(f"Could not find the directory {data_dir}")
     

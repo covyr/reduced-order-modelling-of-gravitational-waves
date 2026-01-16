@@ -1,17 +1,29 @@
 import numpy as np
 import typer
 
-from romgw.config.env import COMMON_TIME, PROJECT_ROOT
+from romgw.config.constants import COMMON_TIME, PROJECT_ROOT, MODE_VALUES
 from romgw.maths.rb import reduced_basis, mgs, gram_matrix
-from romgw.typing.core import RealArray, BBHSpinType, ModeType, ComponentType, DatasetType
-from romgw.typing.utils import validate_literal
+# from romgw.typing.core import RealArray, BBHSpinType, ModeType, ComponentType, DatasetType
+from romgw.config.types import (
+    RealArray,
+    BBHSpinType,
+    ModeType,
+    ComponentType,
+    DatasetType
+)
+# from romgw.typing.utils import validate_literal
+from romgw.config.validation import (
+    validate_literal,
+    validate_dependent_literal
+)
 from romgw.utils.filesystem import empty_directory
 from romgw.waveform.dataset import ComponentWaveformDataset
 
 DATASET: DatasetType = "train"
-COMPONENT_TOLERANCE_DICT = {"amplitude": 1e-12, "phase": 1e-14}
+COMPONENT_TOLERANCE_DICT = {"amplitude": 1e-12, "phase": 1e-10}
 
 HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
+HELP_DATASET = 'Dataset label: "train_xl" = xl training data, "train" = training data, "test" = testing data.'
 HELP_MODE = 'Spin-weighted spherical harmonic label (l, m): "2,2", "2,1", "3,2", "3,3", "4,4", or "4,3".'
 HELP_COMPONENT = 'Waveform component: "amplitude" or "phase".'
 HELP_SAVING = "Whether to save redued basis and greedy errors."
@@ -22,6 +34,7 @@ app = typer.Typer(help="Reduced Order Modelling of Gravitational Waves CLI")
 @app.command()
 def main(
     bbh_spin: BBHSpinType = typer.Option(..., help=HELP_BBH_SPIN),
+    dataset: DatasetType = typer.Option(..., help=HELP_DATASET),
     mode: ModeType = typer.Option(..., help=HELP_MODE),
     component: ComponentType = typer.Option(..., help=HELP_COMPONENT),
     saving: bool = typer.Option(False, "--saving/--no-saving", help=HELP_SAVING),
@@ -63,17 +76,33 @@ def main(
     Examples
     --------
     Find and save the reduced basis for the amplitude of the 2,2 mode of the
-    GW produced by the merger of an NS BBH:
+    GW produced by the merger of an NS BBH for the training set:
 
-        $ python greedy_rb.py --bbh-spin NS --mode 2,2 --component amplitude --saving
+        $ python greedy_rb.py --bbh-spin NS --dataset train --mode 2,2 --component amplitude --saving
     """
-    bbh_spin = validate_literal(bbh_spin, BBHSpinType)
-    mode = validate_literal(mode, ModeType)
-    component = validate_literal(component, ComponentType)
+    bbh_spin = validate_literal(
+        value=bbh_spin,
+        literal_type=BBHSpinType,
+    )
+    dataset = validate_literal(
+        value=dataset,
+        literal_type=DatasetType,
+    )
+    mode = validate_dependent_literal(
+        value=mode,
+        literal_type=ModeType,
+        parent_value=bbh_spin,
+        parent_literal_type=BBHSpinType,
+        dependency_map=MODE_VALUES,
+    )
+    component = validate_literal(
+        value=component,
+        literal_type=ComponentType,
+    )
 
     tolerance: float = COMPONENT_TOLERANCE_DICT[component]
     time: RealArray = COMMON_TIME
-    data_dir = PROJECT_ROOT / "data" / bbh_spin / "train" / mode / component
+    data_dir = PROJECT_ROOT / "data" / bbh_spin / dataset / mode / component
 
     if verbose:
         typer.echo(f"Finding reduced basis for "
@@ -81,6 +110,8 @@ def main(
     
     raw_wf_dir = data_dir / "raw"
     waveforms = ComponentWaveformDataset.from_directory(raw_wf_dir,
+                                                        n=(32768 if dataset=="train_xl" else None),  # my pc doesn't have enough ram to use the full 65536 waveforms
+                                                        seed=(42 if dataset=="train_xl" else None),  # reproducibility
                                                         component=component)
     
     rb, errs = reduced_basis(waveforms,

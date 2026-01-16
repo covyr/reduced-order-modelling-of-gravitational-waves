@@ -1,13 +1,24 @@
 import numpy as np
 import typer
 
-from romgw.config.env import PROJECT_ROOT
+from romgw.config.constants import PROJECT_ROOT, MODE_VALUES
 from romgw.maths.ei import empirical_time_nodes
-from romgw.typing.core import BBHSpinType, ModeType, ComponentType
-from romgw.typing.utils import validate_literal
+# from romgw.typing.core import BBHSpinType, ModeType, ComponentType
+from romgw.config.types import (
+    BBHSpinType,
+    DatasetType,
+    ModeType,
+    ComponentType
+)
+# from romgw.typing.utils import validate_literal
+from romgw.config.validation import (
+    validate_literal,
+    validate_dependent_literal
+)
 from romgw.waveform.dataset import ComponentWaveformDataset
 
 HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
+HELP_DATASET = 'Dataset label: "train_xl" = xl training data, "train" = training data, "test" = testing data.'
 HELP_MODE = 'Spin-weighted spherical harmonic label (l, m): "2,2", "2,1", "3,2", "3,3", "4,4", or "4,3".'
 HELP_COMPONENT = 'Waveform component: "amplitude" or "phase".'
 HELP_SAVING = "Whether to save empirical time nodes and B matrix."
@@ -18,6 +29,7 @@ app = typer.Typer(help="Reduced Order Modelling of Gravitational Waves CLI")
 @app.command()
 def main(
     bbh_spin: BBHSpinType = typer.Option(..., help=HELP_BBH_SPIN),
+    dataset: DatasetType = typer.Option(..., help=HELP_DATASET),
     mode: ModeType = typer.Option(..., help=HELP_MODE),
     component: ComponentType = typer.Option(..., help=HELP_COMPONENT),
     saving: bool = typer.Option(False, "--saving/--no-saving", help=HELP_SAVING),
@@ -61,19 +73,36 @@ def main(
     Examples
     --------
     Find and save the empirical time nodes and B matrix for the amplitude of
-    the 2,2 mode of the GW produced by the merger of an NS BBH:
+    the 2,2 mode of the GW produced by the merger of an NS BBH for the
+    training set:
 
-        $ python greedy_ei.py --bbh-spin NS --mode 2,2 --component amplitude --saving
+        $ python greedy_ei.py --bbh-spin NS --dataset train --mode 2,2 --component amplitude --saving
     """
-    bbh_spin = validate_literal(bbh_spin, BBHSpinType)
-    mode = validate_literal(mode, ModeType)
-    component = validate_literal(component, ComponentType)
+    bbh_spin = validate_literal(
+        value=bbh_spin,
+        literal_type=BBHSpinType,
+    )
+    dataset = validate_literal(
+        value=dataset,
+        literal_type=DatasetType,
+    )
+    mode = validate_dependent_literal(
+        value=mode,
+        literal_type=ModeType,
+        parent_value=bbh_spin,
+        parent_literal_type=BBHSpinType,
+        dependency_map=MODE_VALUES,
+    )
+    component = validate_literal(
+        value=component,
+        literal_type=ComponentType,
+    )
 
     if verbose:
         typer.echo(f"Finding empirical times for "
                    f"{bbh_spin=}, {mode=}, {component=}")
     
-    data_dir = PROJECT_ROOT / "data" / bbh_spin / "train" / mode / component
+    data_dir = PROJECT_ROOT / "data" / bbh_spin / dataset / mode / component
 
     rb_dir = data_dir / "reduced_basis" / "elements"
     rb = ComponentWaveformDataset.from_directory(rb_dir, component=component)

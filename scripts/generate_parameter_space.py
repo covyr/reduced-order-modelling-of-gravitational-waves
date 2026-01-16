@@ -2,13 +2,18 @@ from numpy.typing import NDArray
 import numpy as np
 import typer
 
-from romgw.config.env import PROJECT_ROOT
-from romgw.typing.utils import validate_literal
-from romgw.typing.core import RealArray, BBHSpinType, DatasetType
+from romgw.config.constants import PROJECT_ROOT
+# from romgw.typing.utils import validate_literal
+# from romgw.typing.core import RealArray, BBHSpinType, DatasetType
+from romgw.config.types import RealArray, BBHSpinType, DatasetType
+from romgw.config.validation import validate_literal
 
 # Sizes of training and test datasets.
-N_TRAIN = 4096
-N_TEST = 256
+N = {
+    "train_xl": 65536,  # 2**16
+    "train": 4096,  # 2**12
+    "test": 256,  # 2**8
+}
 
 # Mass ratio domain over which to sample.
 MASS_RATIO_DOMAIN = (1, 10)
@@ -19,8 +24,11 @@ SPIN_THETA_DOMAIN = (-np.pi/2, np.pi/2)
 SPIN_PHI_DOMAIN = (0.0, np.pi)
 
 # Reproducibility.
-TRAIN_SEEDS = [19, 29, 59, 89, 229, 521, 599, 1129, 1229, 1259, 2591]
-TEST_SEEDS = [2, 73, 179, 283, 419, 547, 661, 811, 947, 1087, 1229]
+SEEDS = {
+    "train_xl": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "train": [19, 29, 59, 89, 229, 521, 599, 1129, 1229, 1259, 2591],
+    "test": [2, 73, 179, 283, 419, 547, 661, 811, 947, 1087, 1229],
+}
 
 def uniform_random_space(
     n: int,
@@ -113,7 +121,7 @@ def generate_parameter_space(
     return param_space
 
 HELP_BBH_SPIN = 'Spin configuration: "NS" = no-spin, "AS" = aligned-spin, "PS" = precessing-spin.'
-HELP_DATASET = 'Dataset label: "train" = training data, "test" = testing data.'
+HELP_DATASET = 'Dataset label: "train_xl" = xl training data, "train" = training data, "test" = testing data.'
 HELP_SAVING = "Whether to save the parameter space."
 HELP_OVERWRITING = "Whether to overwrite a pre-existing parameter space file."
 HELP_VERBOSE = "Enable verbose output."
@@ -138,8 +146,8 @@ def main(
     bbh_spin = validate_literal(bbh_spin, BBHSpinType)
     dataset = validate_literal(dataset, DatasetType)
     
-    n = N_TRAIN if dataset == "train" else N_TEST
-    seeds = TRAIN_SEEDS if dataset == "train" else TEST_SEEDS
+    n = N[dataset]
+    seeds = SEEDS[dataset]
 
     if verbose:
         typer.echo(f"Generating parameter space: {bbh_spin=}, {dataset=}")
