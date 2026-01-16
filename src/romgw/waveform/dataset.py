@@ -5,7 +5,8 @@ from typing import Iterable, Iterator
 import numpy as np
 
 from romgw.waveform.params import PhysicalParams
-from romgw.typing.core import ComponentType, RealArray
+# from romgw.typing.core import ComponentType, RealArray
+from romgw.config.types import ComponentType, RealArray
 from romgw.waveform.base import (
     BaseWaveform,
     ComponentWaveform,

@@ -6,7 +6,8 @@ import json
 import numpy as np
 
 from romgw.waveform.params import PhysicalParams
-from romgw.typing.core import RealArray, ModeType
+# from romgw.typing.core import RealArray, ModeType
+from romgw.config.types import RealArray, ModeType
 
 
 # --------------------------------------------------------------------

@@ -8,6 +8,9 @@ from romgw.typing.core import (
     Spin,
 )
 
+# ----------------------------------------------
+# RUNTIME VALIDATION
+# ----------------------------------------------
 def validate_literal(value: str, literal_type: Any) -> str:
     """Validate that a string is one of the allowed Literal values."""
     allowed = literal_values(literal_type)
@@ -84,3 +87,40 @@ def validate_spin(x) -> Spin:
                          f"got {arr}.")
 
     return arr
+
+from romgw.typing.core import (
+    BBHSPIN_VALUES,
+    MODE_VALUES,
+    COMPONENT_VALUES,
+    DATASET_VALUES
+)
+
+def validate_dataset(dataset):
+    """
+    Raise ValueError if not a valid DatasetType
+    """
+    return
+
+
+def validate_bbh_spin(bbh_spin):
+    """
+    Raise ValueError if not a valid BBHSpinType.
+    """
+    if bbh_spin not in BBHSPIN_VALUES:
+        raise ValueError(f"BBH spin {bbh_spin} not valid")
+
+
+def validate_mode(bbh_spin, mode):
+    """
+    Raise ValueError if not a valid ModeType for the given BBHSpinType.
+    """
+    if mode not in MODE_VALUES[bbh_spin]:
+        raise ValueError(f"Mode {mode} not valid for bbh_spin {bbh_spin}")
+
+
+def validate_component(component):
+    """
+    Raise ValueError if not a valid ComponentType.
+    """
+    if component not in COMPONENT_VALUES:
+        raise ValueError(f"Component {component} not valid")

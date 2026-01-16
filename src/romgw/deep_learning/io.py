@@ -6,30 +6,56 @@ from sklearn.preprocessing import MinMaxScaler
 from typing import Literal
 from typing_extensions import overload
 
-from romgw.config.env import PROJECT_ROOT
-from romgw.typing.utils import validate_literal
-from romgw.waveform.dataset import ComponentWaveformDataset
-from romgw.typing.core import (
+from romgw.config.constants import PROJECT_ROOT, MODE_VALUES
+from romgw.config.types import (
     BBHSpinType,
+    DatasetType,
     ModeType,
     ComponentType,
     RealArray
 )
+from romgw.config.validation import (
+    validate_literal,
+    validate_dependent_literal
+)
+from romgw.waveform.dataset import ComponentWaveformDataset
+
 
 def load_raw_training_data(
     bbh_spin: BBHSpinType,
+    dataset: DatasetType,
     mode: ModeType,
     component: ComponentType,
+    n: int | None = None,
+    seed: int | None = None,
 ) -> tuple[RealArray, RealArray]:
     """"""
-    bbh_spin = validate_literal(bbh_spin, BBHSpinType)
-    mode = validate_literal(mode, ModeType)
-    component = validate_literal(component, ComponentType)
+    bbh_spin = validate_literal(
+        value=bbh_spin,
+        literal_type=BBHSpinType,
+    )
+    dataset = validate_literal(
+        value=dataset,
+        literal_type=DatasetType,
+    )
+    mode = validate_dependent_literal(
+        value=mode,
+        literal_type=ModeType,
+        parent_value=bbh_spin,
+        parent_literal_type=BBHSpinType,
+        dependency_map=MODE_VALUES,
+    )
+    component = validate_literal(
+        value=component,
+        literal_type=ComponentType,
+    )
 
-    data_dir = PROJECT_ROOT / "data" / bbh_spin / "train" / mode / component
+    data_dir = PROJECT_ROOT / "data" / bbh_spin / dataset / mode / component
 
     wf_dir = data_dir / "raw"
     waveforms = ComponentWaveformDataset.from_directory(wf_dir,
+                                                        n=n,
+                                                        seed=seed,
                                                         component=component)
 
     empirical_time_nodes_file = (

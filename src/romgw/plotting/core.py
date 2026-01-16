@@ -2,9 +2,10 @@ from matplotlib import gridspec
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-from romgw.config.env import COMMON_TIME
+from romgw.config.constants import COMMON_TIME
 from romgw.maths.core import mismatch
-from romgw.typing.core import ComponentType
+# from romgw.typing.core import ComponentType
+from romgw.config.types import ComponentType
 from romgw.waveform.base import FullWaveform
 from romgw.waveform.dataset import FullWaveformDataset
 
@@ -42,7 +43,7 @@ def plot_same_mode(
             height_ratios=(3, 3, 3),
             left=0,
             right=1,
-            hspace=0.6
+            hspace=0.3
         )
 
     axf = fig.add_subplot(spec[0])
@@ -54,18 +55,17 @@ def plot_same_mode(
         axa.plot(COMMON_TIME, wf.amplitude)
         axp.plot(COMMON_TIME, wf.phase)
         
-    for ax, label in zip([axf, axa, axp], ["", " amplitude", " phase"]):
+    for ax, label in zip([axf, axa, axp], [r"$h$", r"$A$", r"$\phi$"]):
         ax.set_xlim(-5000, 250)
-        ax.set_xlabel("time")
-        ax.set_ylabel(f"waveform{label}")
-        ax.set_title(f"{n} waveform{label}" + ("s" if n > 1 else ""))
+        ax.set_xlabel(r"$t$")
+        ax.set_ylabel(label)
 
     if verbose:
         axl = fig.add_subplot(spec[3])
         axl.set_axis_off()
         handles, labels = axf.get_legend_handles_labels()
         axl.legend(handles, labels, loc='center', ncol=2, framealpha=0)
-
+    
     plt.show()
 
 
@@ -80,7 +80,7 @@ def plot_same_params(
         height_ratios=(3, 3, 3, 1/3),
         left=0,
         right=1,
-        hspace=0.6
+        hspace=0.4
     )
 
     axf = fig.add_subplot(spec[0])
@@ -92,11 +92,10 @@ def plot_same_params(
         axa.plot(COMMON_TIME, wf.amplitude)
         axp.plot(COMMON_TIME, wf.phase)
         
-    for ax, label in zip([axf, axa, axp], ["", " amplitude", " phase"]):
+    for ax, label in zip([axf, axa, axp], [r"$h$", r"$A$", r"$\phi$"]):
         ax.set_xlim(-5000, 250)
-        ax.set_xlabel("time")
-        ax.set_ylabel(f"waveform{label}")
-        ax.set_title(f"waveform mode{label}s for {modes['2,2'].params}")
+        ax.set_xlabel(r"t")
+        ax.set_ylabel(label)
 
     axl = fig.add_subplot(spec[3])
     axl.set_axis_off()
@@ -137,15 +136,15 @@ def plot_mismatch(
         axs.append(ax)
         
         if not component:
-            ylabel = "full waveform"
+            ylabel = r"$h$"
             wf_fid = fiducial_waveforms[i]
             wf_sur = surrogate_waveforms[i]
         elif component == "amplitude":
-            ylabel = "waveform amplitude"
+            ylabel = r"$A$"
             wf_fid = fiducial_waveforms[i].amplitude
             wf_sur = surrogate_waveforms[i].amplitude
         elif component == "phase":
-            ylabel = "waveform phase"
+            ylabel = r"$\phi$"
             wf_fid = fiducial_waveforms[i].phase
             wf_sur = surrogate_waveforms[i].phase
 
@@ -156,10 +155,10 @@ def plot_mismatch(
         y_text = (ymin := ax.get_ylim()[0]) + 0.05*(ax.get_ylim()[1] - ymin)
         ax.text(x=x_text,
                 y=y_text,
-                s=f"mismatch={mismatch(wf_fid, wf_sur):.6e}")
+                s=rf"$1-\mathcal{{{'O'}}}\simeq{mismatch(wf_fid, wf_sur):.2e}$")
         
         ax.set_xlim(-5000, 250)
-        ax.set_xlabel("time")
+        ax.set_xlabel(r"$t$")
         ax.set_ylabel(ylabel)
         ax.set_title(f"{fiducial_waveforms[i].params}")
 

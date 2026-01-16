@@ -3,13 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
 
-from romgw.typing.core import RealArray, MassRatio, Spin
-from romgw.typing.utils import validate_mass_ratio, validate_spin
+# from romgw.typing.core import RealArray, MassRatio, Spin
+# from romgw.typing.utils import validate_mass_ratio, validate_spin
+from romgw.config.types import RealArray, MassRatio, Spin
+from romgw.config.validation import validate_mass_ratio, validate_spin
 
 
-# ----------------------------------------------
+# -----------------------------------------------------------------------------
 # PHYSICAL METADATA
-# ----------------------------------------------
+# -----------------------------------------------------------------------------
 @dataclass(frozen=True, slots=True)
 class PhysicalParams:
     """

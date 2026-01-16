@@ -15,5 +15,11 @@ RC_PARAMS = {
     
     # Other formatting
     "lines.linewidth"   : 1,
+
+    # LaTeX
+    "text.usetex"       : True,
+
+    # Resolution
+    "figure.dpi"        : 512,
 }
 mpl.rcParams.update(RC_PARAMS)

@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from romgw.config.env import COMMON_TIME, ZERO_TOL
-# from romgw.maths.core import dot, mag2, normalise
+from romgw.config.constants import COMMON_TIME, ZERO_TOL
 from romgw.waveform.base import ComponentWaveform
 from romgw.waveform.dataset import ComponentWaveformDataset
 from romgw.waveform.utils import rewrap_like
-from romgw.typing.core import RealArray
+from romgw.config.types import RealArray
 
 
 def dot(
@@ -148,11 +147,11 @@ def reduced_basis(
     # Initial residual norms.
     errors = np.array([mag2(r, time) for r in residuals])
 
-    # TEMP: TESTING WHETHER NORMALISING AT THE START IMPROVES ORTHONORMALITY
     temp = np.argmax(errors)
     errors = np.concatenate((errors[:temp], np.array([1.0]), errors[temp+1:]))
     residuals: list[ComponentWaveform] = [
-        rewrap_like(wf, normalise(wf.copy(), time, zero_tol))
+        # rewrap_like(wf, normalise(wf.copy(), time, zero_tol))  # normalising builds rb more efficiently
+        rewrap_like(wf, wf.copy())
         for wf in waveforms._waveforms
     ]
 
@@ -172,8 +171,9 @@ def reduced_basis(
         if len(rb) >= max_basis:
             if verbose:
                 print(' ' * 80, end='\r')
-                print(f"Tolerance met ({max_err:.2e} > {tolerance:.2e}) "
+                print(f"Max reduced basis size met (len(rb)={max_basis=}) "
                       f"with {max_basis} reduced basis elements.")
+            break
 
         # Select residual with largest norm.
         r = residuals.pop(idx)
@@ -203,10 +203,11 @@ def reduced_basis(
 
         # R <- R - coeffs[:,None] * e
         R = R - proj_coeffs[:, None] * e_arr
+
         # Push results back to ComponentWaveform objects.
         residuals = [rewrap_like(residuals[i], R[i])
                      for i in range(len(residuals))]
-        errors = np.sum(R**2, axis=1)  # real-valued
+        errors = np.trapezoid(R**2, x=time, axis=1)  # real-valued
 
         if verbose:
             print(f"m={len(rb):0{lsM}d}/{M}, "

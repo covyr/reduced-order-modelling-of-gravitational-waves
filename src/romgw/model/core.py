@@ -17,15 +17,16 @@ import keras
 import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import MinMaxScaler
-from typing import Literal
 
-from romgw.config.env import PROJECT_ROOT
-from romgw.typing.core import (
+from romgw.config.constants import PROJECT_ROOT, MODE_VALUES
+from romgw.config.types import (
     RealArray,
     ComplexArray,
     BBHSpinType,
+    DatasetType,
     ModeType,
-    ComponentType
+    ComponentType,
+    ModelNameType,
 )
 
 class ComponentROM:
@@ -34,7 +35,7 @@ class ComponentROM:
     bbh_spin: BBHSpinType
     mode: ModeType
     component: ComponentType
-    name: Literal["NonLinRegV1"]
+    name: ModelNameType
     param_scaler: ColumnTransformer
     model: keras.Model
     waveform_scaler: MinMaxScaler
@@ -43,10 +44,11 @@ class ComponentROM:
     def __init__(
         self,
         bbh_spin: BBHSpinType,
+        dataset: DatasetType,
         mode: ModeType,
         component: ComponentType,
-        name: Literal["NonLinRegV1"] = "NonLinRegV1",
-    ) -> "ComponentROM":
+        name: ModelNameType,
+    ):
         """"""
         self.bbh_spin = bbh_spin
         self.mode = mode
@@ -56,30 +58,13 @@ class ComponentROM:
         models_root = PROJECT_ROOT / "models"
         self.param_scaler = joblib.load(models_root / "x_scaler.gz")
 
-        model_dir = models_root / bbh_spin / name / mode / component
+        model_dir = models_root / bbh_spin / dataset / name / mode / component
         self.model = keras.models.load_model(model_dir / "model.keras")
         self.waveform_scaler = joblib.load(model_dir / "y_scaler.gz")
         self.interpolation_matrix = np.load(model_dir / "interpolation_matrix.npy",
                                             allow_pickle=False)
 
-    def generate_mode_component(self, params_arr: RealArray) -> ComplexArray:
-        """"""
-        params_scaled = self.param_scaler.transform(params_arr[:, np.newaxis])
-        h_nodes_scaled = self.model.predict(params_scaled, verbose=0).astype(np.float64)
-        h_nodes = self.waveform_scaler.inverse_transform(h_nodes_scaled).flatten()
-        return self.interpolation_matrix @ h_nodes
-    
-    def generate_mode_component_vectorised(
-        self,
-        params_arr: RealArray
-    ) -> ComplexArray:
-        """"""
-        params_scaled = self.param_scaler.transform(params_arr)
-        h_nodes_scaled = self.model.predict(params_scaled, verbose=0).astype(np.float64)
-        h_nodes = self.waveform_scaler.inverse_transform(h_nodes_scaled)
-        return (self.interpolation_matrix @ h_nodes.T).T
-
-    def generate_mode_component_generalised(
+    def generate_mode_component(
         self,
         params_arr: RealArray
     ) -> ComplexArray:
@@ -89,6 +74,13 @@ class ComponentROM:
         params_scaled = self.param_scaler.transform(params_arr)
         h_nodes_scaled = self.model.predict(params_scaled, verbose=0).astype(np.float64)
         h_nodes = self.waveform_scaler.inverse_transform(h_nodes_scaled)
+        return (self.interpolation_matrix @ h_nodes.T).T
+
+    def empirical_interpolant(  # for testing purposes
+        self,
+        h_nodes: RealArray,
+    ) -> RealArray:
+        """Use known waveform values construct empirical interpolant."""
         return (self.interpolation_matrix @ h_nodes.T).T
 
     def __repr__(self) -> str:
@@ -104,23 +96,24 @@ class ModeROM:
 
     bbh_spin: BBHSpinType
     mode: ModeType
-    name: Literal["NonLinRegV1"]
+    name: ModelNameType
     component_models: dict[ComponentType, ComponentROM]
 
     def __init__(
         self,
         bbh_spin: BBHSpinType,
+        dataset: DatasetType,
         mode: ModeType,
-        name: Literal["NonLinRegV1"] = "NonLinRegV1",
-    ) -> "ModeROM":
+        name: ModelNameType,
+    ):
         """"""
         self.bbh_spin = bbh_spin
         self.mode = mode
         self.name = name
 
         self.component_models = {
-            "amplitude": ComponentROM(bbh_spin, mode, "amplitude", name),
-            "phase": ComponentROM(bbh_spin, mode, "phase", name),
+            "amplitude": ComponentROM(bbh_spin, dataset, mode, "amplitude", name),
+            "phase": ComponentROM(bbh_spin, dataset, mode, "phase", name),
         }
 
     def generate_mode(
@@ -133,27 +126,17 @@ class ModeROM:
         phi_arr = (self.component_models["phase"]
                        .generate_mode_component(params_arr))
         return amp_arr * np.exp(-1j * phi_arr)
-    
-    def generate_mode_vectorised(
+
+    def empirical_interpolant(  # for testing purposes
         self,
-        params_arr: RealArray,
+        amp_nodes: RealArray,
+        phi_nodes: RealArray,
     ) -> RealArray:
         """"""
         amp_arr = (self.component_models["amplitude"]
-                       .generate_mode_component_vectorised(params_arr))
+                       .empirical_interpolant(amp_nodes))
         phi_arr = (self.component_models["phase"]
-                       .generate_mode_component_vectorised(params_arr))
-        return amp_arr * np.exp(-1j * phi_arr)
-    
-    def generate_mode_generalised(
-        self,
-        params_arr: RealArray,
-    ) -> RealArray:
-        """"""
-        amp_arr = (self.component_models["amplitude"]
-                       .generate_mode_component_vectorised(params_arr))
-        phi_arr = (self.component_models["phase"]
-                       .generate_mode_component_vectorised(params_arr))
+                       .empirical_interpolant(phi_nodes))
         return amp_arr * np.exp(-1j * phi_arr)
 
     def __repr__(self) -> str:
@@ -167,53 +150,31 @@ class ROMGW:
     """"""
 
     bbh_spin: BBHSpinType
-    name: Literal["NonLinRegV1"]
+    name: ModelNameType
     mode_models: dict[ModeType, ModeROM]
 
     def __init__(
         self,
         bbh_spin: BBHSpinType,
-        name: Literal["NonLinRegV1"] = "NonLinRegV1",
-    ) -> "ROMGW":
+        dataset: DatasetType,
+        name: ModelNameType,
+    ):
         """"""
         self.bbh_spin = bbh_spin
         self.name = name
 
-        model_dir = PROJECT_ROOT / "models" / bbh_spin / name
+        model_dir = PROJECT_ROOT / "models" / bbh_spin / dataset / name
         mode_list = [m.name for m in model_dir.iterdir() if m.is_dir]
-        self.mode_models = {m: ModeROM(bbh_spin, m, name)
-                            for m in mode_list}
+        self.mode_models = {m: ModeROM(bbh_spin, dataset, m, name)
+                            for m in mode_list}  # all currently implemented nodes
+                            # for m in MODE_VALUES[bbh_spin]}  # all desired modes
 
     def generate_modes(
         self,
         params_arr: RealArray
-    ) -> dict[ModeType, RealArray]:
-        """"""
-        return {m: mode_model.generate_mode(params_arr)
-                for m, mode_model in self.mode_models.items()}
-    
-    def generate_modes_vectorised(
-        self,
-        params_arr: RealArray
-    ) -> list[dict[ModeType, RealArray]]:
-        """"""
-        modes_arr = {m: mode_model.generate_mode_vectorised(params_arr)
-                        for m, mode_model in self.mode_models.items()}
-        modes = []
-        for i in range(len(params_arr)):
-            modes.append({mode_key: mode_val[i]
-                          for mode_key, mode_val in modes_arr.items()})
-        return [
-            {mode_key: mode_val[i] for mode_key, mode_val in modes_arr.items()}
-            for i in range(len(params_arr))
-        ]
-
-    def generate_modes_generalised(
-        self,
-        params_arr: RealArray
     ) -> list[dict[ModeType, RealArray]] | dict[ModeType, RealArray]:
         """"""
-        modes_arr = {m: mode_model.generate_mode_vectorised(params_arr)
+        modes_arr = {m: mode_model.generate_mode(params_arr)
                         for m, mode_model in self.mode_models.items()}
         
         generating_one_waveform = True if params_arr.ndim == 1 else False

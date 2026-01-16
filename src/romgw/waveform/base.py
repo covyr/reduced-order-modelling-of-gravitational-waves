@@ -5,7 +5,13 @@ from pathlib import Path
 import numpy as np
 
 from romgw.waveform.params import PhysicalParams
-from romgw.typing.core import (
+# from romgw.typing.core import (
+#     RealArray,
+#     ComplexArray,
+#     ComponentType,
+#     Spin,
+# )
+from romgw.config.types import (
     RealArray,
     ComplexArray,
     ComponentType,

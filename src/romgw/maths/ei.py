@@ -1,7 +1,8 @@
 from typing import Tuple
 import numpy as np
 
-from romgw.typing.core import RealArray
+# from romgw.typing.core import RealArray
+from romgw.config.types import RealArray
 from romgw.waveform.dataset import ComponentWaveformDataset
 
 
@@ -68,7 +69,7 @@ def empirical_time_nodes(
         I = B @ v[etns]  # empirical interpolant
         r = I - v  # minimise this (aiming for I ~= v)
         
-        r[etns] *= 0  # ensure unique node selection
+        # r[etns] *= 0  # ensure unique node selection
         node = np.argmax(np.abs(r))  # node which most needs additional 'help'
         etns.append(node.astype(int))
 

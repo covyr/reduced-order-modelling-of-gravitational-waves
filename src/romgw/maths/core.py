@@ -4,8 +4,8 @@ from pycbc import filter as pyfilter
 from pycbc import psd as pypsd
 from pycbc.types import TimeSeries
 
-from romgw.config.env import COMMON_TIME, ZERO_TOL
-from romgw.waveform.dataset import ComponentWaveformDataset
+from romgw.config.constants import COMMON_TIME, ZERO_TOL
+from romgw.config.types import RealArray
 from romgw.waveform.utils import rewrap_like
 from romgw.waveform.typing import WaveformT
 
@@ -14,9 +14,9 @@ from romgw.waveform.base import (
     ComponentWaveform,
     FullWaveform,
 )
-from romgw.typing.core import (
-    RealArray
-)
+# from romgw.typing.core import (
+#     RealArray
+# )
 
 
 def _dot_integrand(wf_a: BaseWaveform, wf_b: BaseWaveform) -> RealArray:
